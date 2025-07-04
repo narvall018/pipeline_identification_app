@@ -54,139 +54,104 @@ DATABASE_CATEGORIES = {
     'UNCLASSIFIED': 12040
 }
 
-# Palette de couleurs distinctes pour les groupes
+# Palette de couleurs distinctes et contrastées pour les groupes
 DISTINCT_COLORS = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
-    '#c49c94', '#f7b6d3', '#c7c7c7', '#dbdb8d', '#9edae5',
-    '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173',
-    '#bd9e39', '#ad494a', '#8ca252', '#6b6ecf', '#b5cf6b'
+    '#FF6B6B',  # Rouge corail
+    '#4ECDC4',  # Turquoise
+    '#45B7D1',  # Bleu ciel
+    '#96CEB4',  # Vert menthe
+    '#FFEAA7',  # Jaune pastel
+    '#DDA0DD',  # Prune
+    '#98D8C8',  # Vert d'eau
+    '#F7DC6F',  # Jaune doré
+    '#BB8FCE',  # Violet pastel
+    '#85C1E9',  # Bleu pastel
+    '#F8C471',  # Orange pastel
+    '#82E0AA',  # Vert clair
+    '#F1948A',  # Rose saumon
+    '#85D4E3',  # Cyan clair
+    '#F4D03F',  # Jaune moutarde
+    '#D7BDE2',  # Lilas
+    '#A3E4D7',  # Menthe glacée
+    '#FAD7A0',  # Pêche
+    '#D5A6BD',  # Rose poudré
+    '#AED6F1'   # Bleu poudré
 ]
 
-# CSS personnalisé amélioré
+# CSS personnalisé adapté pour mode sombre/clair
 st.markdown("""
 <style>
     .main > div {
         padding-top: 1rem;
     }
     .stMetric {
-        background-color: #f0f2f6;
-        border: 1px solid #d0d0d0;
+        background-color: var(--background-color);
+        border: 1px solid var(--border-color);
         padding: 1rem;
         border-radius: 0.5rem;
         margin: 0.5rem 0;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .highlight-box {
-        background-color: #e8f4fd;
-        border-left: 5px solid #1f77b4;
+        background-color: var(--secondary-background-color);
+        border-left: 5px solid var(--primary-color);
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0.25rem;
     }
     .info-box {
-        background-color: #fff9e6;
-        border: 2px solid #ffcc00;
+        background-color: var(--secondary-background-color);
+        border: 2px solid var(--primary-color);
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0.5rem;
     }
     .success-box {
-        background-color: #e6f4ea;
+        background-color: var(--secondary-background-color);
         border: 2px solid #34a853;
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0.5rem;
     }
     .warning-box {
-        background-color: #fef7e0;
+        background-color: var(--secondary-background-color);
         border: 2px solid #fbbc04;
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0.5rem;
     }
     .error-box {
-        background-color: #fce8e6;
+        background-color: var(--secondary-background-color);
         border: 2px solid #ea4335;
         padding: 1rem;
         margin: 1rem 0;
         border-radius: 0.5rem;
     }
-    .confidence-level-1 {
-        background-color: #d4edda;
-        border: 2px solid #28a745;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        color: #155724;
-        font-weight: bold;
-        text-align: center;
-    }
-    .confidence-level-2 {
-        background-color: #d1ecf1;
-        border: 2px solid #17a2b8;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        color: #0c5460;
-        font-weight: bold;
-        text-align: center;
-    }
-    .confidence-level-3 {
-        background-color: #fff3cd;
-        border: 2px solid #ffc107;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        color: #856404;
-        font-weight: bold;
-        text-align: center;
-    }
-    .confidence-level-4 {
-        background-color: #f8d7da;
-        border: 2px solid #dc3545;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        color: #721c24;
-        font-weight: bold;
-        text-align: center;
-    }
-    .confidence-level-5 {
-        background-color: #e2e3e5;
-        border: 2px solid #6c757d;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        color: #383d41;
-        font-weight: bold;
-        text-align: center;
-    }
     .molecule-card {
-        background-color: #ffffff;
-        border: 1px solid #e0e0e0;
+        background-color: var(--background-color);
+        border: 1px solid var(--border-color);
         padding: 1.5rem;
         margin: 1rem 0;
         border-radius: 0.5rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     .assignment-explanation {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
         padding: 2rem;
         border-radius: 1rem;
         margin: 1rem 0;
     }
-    .clickable-row:hover {
-        background-color: #f0f8ff;
-        cursor: pointer;
-    }
     .detection-factor {
-        background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
-        color: white;
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
         padding: 1.5rem;
         border-radius: 0.8rem;
         margin: 1rem 0;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
     .confidence-table {
-        background: white;
+        background-color: var(--background-color);
         border-radius: 10px;
         padding: 20px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -198,32 +163,29 @@ st.markdown("""
         margin: 0;
     }
     .confidence-table th {
-        background: transparent;
-        color: black;
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
         padding: 15px;
         text-align: center;
         font-weight: bold;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color);
     }
     .confidence-table td {
         padding: 12px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--border-color);
         vertical-align: top;
+        color: var(--text-color);
     }
     .confidence-table tr:hover {
-        background-color: #f8f9fa;
+        background-color: var(--secondary-background-color);
     }
-    .level-1 { background-color: transparent !important; }
-    .level-2 { background-color: transparent !important; }
-    .level-3 { background-color: transparent !important; }
-    .level-4 { background-color: transparent !important; }
-    .level-5 { background-color: transparent !important; }
     .explanation-text {
-        background-color: #f8f9fa;
-        border-left: 4px solid #007bff;
+        background-color: var(--secondary-background-color);
+        border-left: 4px solid var(--primary-color);
         padding: 15px;
         margin: 10px 0;
         border-radius: 5px;
+        color: var(--text-color);
     }
     .criteria-success {
         color: #28a745;
@@ -238,16 +200,28 @@ st.markdown("""
         font-weight: bold;
     }
     .ecotox-card {
-        background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
-        color: white;
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
         padding: 1.5rem;
         border-radius: 0.8rem;
         margin: 1rem 0;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
-    .toxic { background-color: #ffebee !important; border-left: 5px solid #f44336; }
-    .moderate { background-color: #fff3e0 !important; border-left: 5px solid #ff9800; }
-    .safe { background-color: #e8f5e8 !important; border-left: 5px solid #4caf50; }
+    .toxic { 
+        background-color: var(--secondary-background-color) !important; 
+        border-left: 5px solid #f44336; 
+        color: var(--text-color);
+    }
+    .moderate { 
+        background-color: var(--secondary-background-color) !important; 
+        border-left: 5px solid #ff9800; 
+        color: var(--text-color);
+    }
+    .safe { 
+        background-color: var(--secondary-background-color) !important; 
+        border-left: 5px solid #4caf50; 
+        color: var(--text-color);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -468,7 +442,7 @@ def calculate_detection_factor(df, samples_list, confidence_levels=None):
     return detection_factors
 
 def plot_detection_factor_radar(detection_factors):
-    """Graphique radar du facteur de détection par échantillon"""
+    """Graphique radar du facteur de détection par échantillon avec couleurs contrastées"""
     if not detection_factors:
         st.warning("Aucun facteur de détection calculé")
         return
@@ -476,9 +450,6 @@ def plot_detection_factor_radar(detection_factors):
     fig = go.Figure()
     
     categories = list(DATABASE_CATEGORIES.keys())
-    
-    # Utiliser des couleurs distinctes
-    colors = DISTINCT_COLORS[:len(detection_factors)]
     
     for idx, (sample, factors) in enumerate(detection_factors.items()):
         values = [factors.get(cat, 0) for cat in categories]
@@ -488,7 +459,7 @@ def plot_detection_factor_radar(detection_factors):
             theta=categories,
             fill='toself',
             name=sample,
-            line=dict(width=2, color=colors[idx]),
+            line=dict(width=2, color=DISTINCT_COLORS[idx % len(DISTINCT_COLORS)]),
             opacity=0.7
         ))
     
@@ -497,23 +468,25 @@ def plot_detection_factor_radar(detection_factors):
             radialaxis=dict(
                 visible=True,
                 range=[0, max([max(factors.values()) for factors in detection_factors.values()]) if detection_factors else 1],
-                ticksuffix='%'
+                ticksuffix='%',
+                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+            ),
+            angularaxis=dict(
+                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
             )),
         showlegend=True,
         title="Facteur de détection par catégorie et échantillon (%)<br><sub>Nombre détecté / Nombre total dans la base × 100</sub>",
-        height=600
+        height=600,
+        font=dict(color='white')  # Amélioration visibilité mode sombre
     )
     
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("detection_factor_radar"))
 
 def plot_category_distribution_radar(df, samples_list, confidence_levels=None):
-    """Radar de distribution des catégories par échantillon avec filtrage par niveau de confiance"""
+    """Radar de distribution des catégories par échantillon avec filtrage par niveau de confiance et couleurs contrastées"""
     fig = go.Figure()
     
     categories = list(DATABASE_CATEGORIES.keys())
-    
-    # Utiliser des couleurs distinctes
-    colors = DISTINCT_COLORS[:len(samples_list)]
     
     for idx, sample in enumerate(samples_list):
         sample_data = df[df['samples'].str.contains(sample, na=False)]
@@ -539,7 +512,7 @@ def plot_category_distribution_radar(df, samples_list, confidence_levels=None):
             theta=categories,
             fill='toself',
             name=sample,
-            line=dict(width=2, color=colors[idx]),
+            line=dict(width=2, color=DISTINCT_COLORS[idx % len(DISTINCT_COLORS)]),
             opacity=0.7
         ))
     
@@ -547,11 +520,16 @@ def plot_category_distribution_radar(df, samples_list, confidence_levels=None):
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, max([max([category_counts[cat] for cat in categories]) for sample in samples_list]) if samples_list else 1]
+                range=[0, max([max([category_counts[cat] for cat in categories]) for sample in samples_list]) if samples_list else 1],
+                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+            ),
+            angularaxis=dict(
+                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
             )),
         showlegend=True,
         title="Distribution des molécules uniques par catégorie et échantillon",
-        height=600
+        height=600,
+        font=dict(color='white')  # Amélioration visibilité mode sombre
     )
     
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("category_distribution_radar"))
@@ -793,7 +771,7 @@ def analyze_ecotoxicity(compound_data):
             go.Bar(
                 x=list(ecotox_data.keys()),
                 y=values,
-                marker_color=[DISTINCT_COLORS[i % len(DISTINCT_COLORS)] for i in range(len(values))],
+                marker_color=DISTINCT_COLORS[:len(values)],
                 text=[f'{v:.2f} µg/L' for v in values],
                 textposition='auto'
             )
@@ -808,16 +786,16 @@ def analyze_ecotoxicity(compound_data):
         )
         
         # Ajouter des lignes de seuil seulement si elles sont dans la plage visible
-        for level, threshold in list(thresholds.items())[:-1]:
+        for i, (level, threshold) in enumerate(list(thresholds.items())[:-1]):
             if y_min <= threshold <= y_max:
                 fig.add_hline(y=threshold, line_dash="dash", 
                              annotation_text=f"Seuil: {level}",
-                             line_color=DISTINCT_COLORS[list(thresholds.keys()).index(level)])
+                             line_color=DISTINCT_COLORS[(i+3) % len(DISTINCT_COLORS)])
         
         st.plotly_chart(fig, use_container_width=True, key=generate_unique_key(f"ecotox_comparison_{compound_data.get('match_name', 'unknown')}"))
 
 def plot_ms2_comparison_enhanced(compound_data):
-    """Version améliorée de la comparaison des spectres MS2"""
+    """Version améliorée de la comparaison des spectres MS2 avec seulement 2 couleurs"""
     exp_mz = compound_data.get('ms2_mz_experimental', [])
     exp_int = compound_data.get('ms2_intensities_experimental', [])
     ref_mz = compound_data.get('ms2_mz_reference', [])
@@ -840,8 +818,12 @@ def plot_ms2_comparison_enhanced(compound_data):
     else:
         ref_int_norm = []
     
-    # Créer le graphique miroir
+    # Créer le graphique miroir avec seulement 2 couleurs fixes
     fig = go.Figure()
+    
+    # Couleurs fixes pour expérimental et référence
+    exp_color = '#FF6B6B'  # Rouge pour expérimental
+    ref_color = '#4ECDC4'  # Turquoise pour référence
     
     # Spectre expérimental (positif)
     if exp_mz and exp_int_norm:
@@ -850,7 +832,7 @@ def plot_ms2_comparison_enhanced(compound_data):
                 x=[mz, mz],
                 y=[0, intensity],
                 mode='lines',
-                line=dict(color=DISTINCT_COLORS[0], width=2),
+                line=dict(color=exp_color, width=2),
                 showlegend=False,
                 hovertemplate=f"Exp: m/z={mz:.2f}<br>Int={intensity:.1f}%<extra></extra>"
             ))
@@ -862,22 +844,22 @@ def plot_ms2_comparison_enhanced(compound_data):
                 x=[mz, mz],
                 y=[0, -intensity],
                 mode='lines',
-                line=dict(color=DISTINCT_COLORS[1], width=2),
+                line=dict(color=ref_color, width=2),
                 showlegend=False,
                 hovertemplate=f"Ref: m/z={mz:.2f}<br>Int={intensity:.1f}%<extra></extra>"
             ))
     
-    # Ajouter les légendes
+    # Ajouter les légendes avec les mêmes couleurs
     fig.add_trace(go.Scatter(
         x=[None], y=[None],
         mode='lines',
-        line=dict(color=DISTINCT_COLORS[0], width=2),
+        line=dict(color=exp_color, width=2),
         name='Expérimental'
     ))
     fig.add_trace(go.Scatter(
         x=[None], y=[None],
         mode='lines',
-        line=dict(color=DISTINCT_COLORS[1], width=2),
+        line=dict(color=ref_color, width=2),
         name='Référence'
     ))
     
@@ -949,7 +931,7 @@ def plot_sample_overview(df, sample_name):
     return sample_data
 
 def plot_confidence_levels_distribution(df):
-    """Distribution des niveaux de confiance avec couleurs distinctes"""
+    """Distribution des niveaux de confiance"""
     if 'confidence_level' in df.columns:
         conf_data = df['confidence_level'].value_counts().sort_index()
         
@@ -1036,7 +1018,7 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
         st.warning("Aucune donnée pour les niveaux sélectionnés")
         return
     
-    # Graphique en barres empilées avec couleurs distinctes
+    # Graphique en barres empilées
     fig = px.bar(
         conf_df,
         x='Échantillon',
@@ -1050,7 +1032,7 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("confidence_comparison_across_samples_filtered"))
 
 def plot_level1_bubble_plot(df, samples_list):
-    """Bubble plot pour les molécules avec choix de niveaux de confiance et couleurs distinctes"""
+    """Bubble plot pour les molécules avec choix de niveaux de confiance"""
     if 'confidence_level' not in df.columns:
         st.warning("Colonne confidence_level non trouvée")
         return
@@ -1112,7 +1094,7 @@ def plot_level1_bubble_plot(df, samples_list):
     
     aggregated_bubble['log_Intensité'] = np.log10(aggregated_bubble['Intensité'])
     
-    # Créer le bubble plot avec couleurs distinctes
+    # Créer le bubble plot
     fig = px.scatter(
         aggregated_bubble,
         x='Échantillon',
@@ -1161,7 +1143,7 @@ def calculate_jaccard_similarity(df, samples_list):
     return jaccard_matrix.astype(float)
 
 def plot_hierarchical_clustering(df, samples_list, confidence_levels=None, selected_samples=None):
-    """Clustering hiérarchique des échantillons avec filtrage par niveau de confiance et couleurs distinctes"""
+    """Clustering hiérarchique des échantillons avec filtrage par niveau de confiance"""
     # Filtrer par échantillons sélectionnés
     filtered_samples = samples_list
     if selected_samples and len(selected_samples) > 0:
@@ -1212,12 +1194,12 @@ def plot_hierarchical_clustering(df, samples_list, confidence_levels=None, selec
     # Utiliser scipy pour créer le dendrogramme
     dendro = dendrogram(linkage_matrix, labels=filtered_samples, no_plot=True)
     
-    # Convertir en plotly avec couleurs distinctes
+    # Convertir en plotly
     for i, d in zip(dendro['icoord'], dendro['dcoord']):
         fig.add_trace(go.Scatter(
             x=i, y=d,
             mode='lines',
-            line=dict(color=DISTINCT_COLORS[0], width=2),
+            line=dict(width=2, color=DISTINCT_COLORS[0]),
             showlegend=False
         ))
     
@@ -1240,7 +1222,7 @@ def plot_hierarchical_clustering(df, samples_list, confidence_levels=None, selec
     
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("hierarchical_clustering"))
     
-    # Afficher la matrice de Jaccard avec couleurs améliorées
+    # Afficher la matrice de Jaccard
     st.subheader("Matrice de similarité de Jaccard")
     fig_heatmap = px.imshow(
         jaccard_matrix,
@@ -1277,7 +1259,7 @@ def safe_pca_analysis(matrix_df, n_components=3):
     return pca, X_pca, X_scaled
 
 def plot_3d_pca(matrix_df):
-    """PCA en 3D avec gestion d'erreur et couleurs distinctes"""
+    """PCA en 3D avec gestion d'erreur"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
@@ -1308,7 +1290,7 @@ def plot_3d_pca(matrix_df):
             st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_2d_plot"))
         return
     
-    # PCA 3D normale avec couleurs distinctes
+    # PCA 3D normale
     fig = px.scatter_3d(
         x=X_pca[:, 0],
         y=X_pca[:, 1],
@@ -1330,7 +1312,7 @@ def plot_3d_pca(matrix_df):
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_3d_plot"))
 
 def plot_tsne_analysis(matrix_df):
-    """Analyse t-SNE avec gestion d'erreur et couleurs distinctes"""
+    """Analyse t-SNE avec gestion d'erreur"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
@@ -1382,7 +1364,7 @@ def plot_tsne_analysis(matrix_df):
         st.error(f"Erreur t-SNE : {str(e)}")
 
 def perform_pca_analysis(matrix_df):
-    """Effectue une analyse PCA sécurisée sur la matrice des features avec couleurs distinctes"""
+    """Effectue une analyse PCA sécurisée sur la matrice des features"""
     if matrix_df is None or matrix_df.empty:
         st.error("Aucune matrice de features chargée")
         return
@@ -1399,7 +1381,7 @@ def perform_pca_analysis(matrix_df):
     col1, col2 = st.columns(2)
     
     with col1:
-        # Graphique de variance expliquée avec couleurs distinctes
+        # Graphique de variance expliquée
         fig1 = go.Figure()
         fig1.add_trace(go.Bar(
             x=list(range(1, len(variance_ratio) + 1)),
@@ -1422,7 +1404,7 @@ def perform_pca_analysis(matrix_df):
         st.plotly_chart(fig1, use_container_width=True, key=generate_unique_key("pca_variance_plot"))
     
     with col2:
-        # Score plot PCA avec couleurs distinctes
+        # Score plot PCA
         if X_pca.shape[1] >= 2:
             fig2 = px.scatter(
                 x=X_pca[:, 0],
@@ -1462,35 +1444,35 @@ def show_confidence_levels_table():
                 </tr>
             </thead>
             <tbody>
-                <tr class="level-1">
+                <tr>
                     <td><strong>🥇 1</strong></td>
                     <td><strong>Confirmé<br>(Gold Standard)</strong></td>
                     <td>• m/z ≤ 5 ppm<br>• RT observé ≤ 0.1 min<br>• CCS expérimental ≤ 8%<br>• MS/MS parfait ≥ 0.7<br>• Spectre MS2 en base</td>
                     <td>-</td>
                     <td>Match parfait avec standards de référence<br>(m/z + RT obs + CCS exp + MS/MS parfait)</td>
                 </tr>
-                <tr class="level-2">
+                <tr>
                     <td><strong>🥈 2</strong></td>
                     <td><strong>Probable</strong></td>
                     <td>• m/z ≤ 5 ppm<br>• CCS expérimental ≤ 8%<br>• MS/MS bon 0.4-0.7<br>• Spectre MS2 en base</td>
                     <td>• RT observé<br>(peut être absent)</td>
                     <td>Match probable avec références<br>(m/z + CCS exp + MS/MS base de données)</td>
                 </tr>
-                <tr class="level-3">
+                <tr>
                     <td><strong>🥉 3</strong></td>
                     <td><strong>Tentative</strong></td>
                     <td>• m/z ≤ 5 ppm<br>• CCS (exp OU prédit) ≤ 8%<br>• MS/MS partiel 0.2-0.4<br>• Spectre MS2 en base</td>
                     <td>• RT prédit autorisé<br>• Prédictions acceptées</td>
                     <td>Match possible avec prédictions<br>(m/z + CCS + MS/MS partiel)</td>
                 </tr>
-                <tr class="level-4">
+                <tr>
                     <td><strong>⚠️ 4</strong></td>
                     <td><strong>Équivoque</strong></td>
                     <td>• m/z ≤ 5 ppm<br>• CCS (exp OU prédit)</td>
                     <td>• MS/MS < 0.2 ou absent<br>• RT peut aider</td>
                     <td>Match tentatif avec aide CCS<br>(m/z + CCS pour distinction)</td>
                 </tr>
-                <tr class="level-5">
+                <tr>
                     <td><strong>❓ 5</strong></td>
                     <td><strong>Incertain</strong></td>
                     <td>• m/z ≤ 5 ppm</td>
@@ -1631,7 +1613,7 @@ def main():
                     unique_cats = len(set(all_cats))
                     st.metric("Catégories", unique_cats)
             
-            # Graphiques principaux
+            # Graphiques principaux - SUPPRESSION DE LA DISTRIBUTION DES INTENSITÉS
             col1, col2 = st.columns(2)
             
             with col1:
@@ -1657,18 +1639,6 @@ def main():
                         st.plotly_chart(fig_error, use_container_width=True, key=generate_unique_key("overview_mz_error"))
             
             with col2:
-                # Distribution des intensités
-                fig_int = px.histogram(
-                    features_df,
-                    x='intensity',
-                    nbins=50,
-                    title="Distribution des intensités (échelle log)",
-                    log_y=True,
-                    color_discrete_sequence=DISTINCT_COLORS
-                )
-                fig_int.update_xaxes(type="log")
-                st.plotly_chart(fig_int, use_container_width=True, key=generate_unique_key("overview_intensity_dist"))
-                
                 # Score MS2 distribution
                 if 'ms2_similarity_score' in features_df.columns:
                     ms2_data = features_df[features_df['ms2_similarity_score'] > 0]
@@ -1974,7 +1944,7 @@ def main():
                             # Niveau de confiance avec explication
                             level = molecule_data.get('confidence_level', 'N/A')
                             st.markdown(f"""
-                            <div class="confidence-level-{level}">
+                            <div class="info-box">
                             <h3>Niveau de confiance : {level}</h3>
                             </div>
                             """, unsafe_allow_html=True)
@@ -2294,7 +2264,7 @@ def main():
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    # Comparaison des identifications avec couleurs distinctes
+                    # Comparaison des identifications
                     fig1 = px.bar(
                         stats_df,
                         x='Échantillon',
@@ -2306,7 +2276,7 @@ def main():
                     st.plotly_chart(fig1, use_container_width=True, key=generate_unique_key("comparison_features_vs_identified"))
                 
                 with col2:
-                    # Taux d'identification avec couleurs distinctes
+                    # Taux d'identification
                     fig2 = px.bar(
                         stats_df.sort_values('Taux_identification_%', ascending=False),
                         x='Échantillon',
@@ -2326,7 +2296,7 @@ def main():
                 st.subheader("🫧 Bubble plot - Intensités des molécules par niveau")
                 plot_level1_bubble_plot(features_df, samples_list)
                 
-                # Graphique radar multi-critères avec couleurs distinctes
+                # Graphique radar multi-critères
                 st.subheader("🎯 Comparaison multi-critères (radar)")
                 
                 # Sélection des métriques
@@ -2348,7 +2318,7 @@ def main():
                             theta=selected_metrics,
                             fill='toself',
                             name=row['Échantillon'],
-                            line=dict(color=DISTINCT_COLORS[idx % len(DISTINCT_COLORS)]),
+                            line=dict(width=2, color=DISTINCT_COLORS[idx % len(DISTINCT_COLORS)]),
                             opacity=0.7
                         ))
                     
@@ -2356,11 +2326,16 @@ def main():
                         polar=dict(
                             radialaxis=dict(
                                 visible=True,
-                                range=[0, max([stats_df[metric].max() for metric in selected_metrics])]
+                                range=[0, max([stats_df[metric].max() for metric in selected_metrics])],
+                                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                            ),
+                            angularaxis=dict(
+                                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
                             )),
                         showlegend=True,
                         title="Comparaison multi-critères des échantillons",
-                        height=600
+                        height=600,
+                        font=dict(color='white')  # Amélioration visibilité mode sombre
                     )
                     
                     st.plotly_chart(fig_radar, use_container_width=True, key=generate_unique_key("comparison_radar_multicriteria"))
@@ -2450,7 +2425,7 @@ def main():
                 
                 st.markdown("---")
                 
-                # Heatmap des intensités avec couleurs distinctes
+                # Heatmap des intensités
                 st.subheader("🔥 Heatmap des intensités")
                 
                 # Log transformation pour une meilleure visualisation
@@ -2807,7 +2782,7 @@ def main():
                     level_molecules = features_df[features_df['confidence_level'] == level]['match_name'].dropna().unique()
                     level_counts[level] = len(level_molecules)
                 
-                # Graphique en entonnoir des niveaux avec couleurs distinctes
+                # Graphique en entonnoir des niveaux
                 fig = go.Figure(go.Funnel(
                     y=[f"Niveau {i}" for i in level_counts.keys()],
                     x=list(level_counts.values()),
@@ -2876,7 +2851,7 @@ def main():
                         else:
                             st.dataframe(top_molecules.round(3), use_container_width=True)
                 
-                # Analyse des critères par niveau avec couleurs distinctes
+                # Analyse des critères par niveau
                 st.subheader(f"📈 Analyse des critères - Niveau {selected_level}")
                 
                 col1, col2 = st.columns(2)
@@ -2951,7 +2926,7 @@ def main():
         # Affichage du tableau
         st.dataframe(db_df, use_container_width=True)
         
-        # Graphique de la distribution avec couleurs distinctes
+        # Graphique de la distribution
         fig_db = px.pie(
             db_df.head(10),  # Top 10 pour la lisibilité
             values='Nombre_molécules',
