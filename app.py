@@ -442,7 +442,7 @@ def calculate_detection_factor(df, samples_list, confidence_levels=None):
     return detection_factors
 
 def plot_detection_factor_radar(detection_factors):
-    """Graphique radar du facteur de détection par échantillon avec couleurs contrastées"""
+    """Graphique radar du facteur de détection par échantillon avec couleurs visibles dans les deux thèmes"""
     if not detection_factors:
         st.warning("Aucun facteur de détection calculé")
         return
@@ -469,21 +469,21 @@ def plot_detection_factor_radar(detection_factors):
                 visible=True,
                 range=[0, max([max(factors.values()) for factors in detection_factors.values()]) if detection_factors else 1],
                 ticksuffix='%',
-                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                tickfont=dict(size=12, color='#555555')  # Gris foncé visible sur les deux thèmes
             ),
             angularaxis=dict(
-                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                tickfont=dict(size=12, color='#555555')  # Gris foncé visible sur les deux thèmes
             )),
         showlegend=True,
         title="Facteur de détection par catégorie et échantillon (%)<br><sub>Nombre détecté / Nombre total dans la base × 100</sub>",
         height=600,
-        font=dict(color='white')  # Amélioration visibilité mode sombre
+        font=dict(color='#555555')  # Gris foncé pour tout le texte
     )
     
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("detection_factor_radar"))
 
 def plot_category_distribution_radar(df, samples_list, confidence_levels=None):
-    """Radar de distribution des catégories par échantillon avec filtrage par niveau de confiance et couleurs contrastées"""
+    """Radar de distribution des catégories par échantillon avec filtrage par niveau de confiance et couleurs visibles dans les deux thèmes"""
     fig = go.Figure()
     
     categories = list(DATABASE_CATEGORIES.keys())
@@ -521,15 +521,15 @@ def plot_category_distribution_radar(df, samples_list, confidence_levels=None):
             radialaxis=dict(
                 visible=True,
                 range=[0, max([max([category_counts[cat] for cat in categories]) for sample in samples_list]) if samples_list else 1],
-                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                tickfont=dict(size=12, color='#555555')  # Gris foncé visible sur les deux thèmes
             ),
             angularaxis=dict(
-                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                tickfont=dict(size=12, color='#555555')  # Gris foncé visible sur les deux thèmes
             )),
         showlegend=True,
         title="Distribution des molécules uniques par catégorie et échantillon",
         height=600,
-        font=dict(color='white')  # Amélioration visibilité mode sombre
+        font=dict(color='#555555')  # Gris foncé pour tout le texte
     )
     
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("category_distribution_radar"))
@@ -2296,7 +2296,7 @@ def main():
                 st.subheader("🫧 Bubble plot - Intensités des molécules par niveau")
                 plot_level1_bubble_plot(features_df, samples_list)
                 
-                # Graphique radar multi-critères
+                # Graphique radar multi-critères avec couleurs visibles dans les deux thèmes
                 st.subheader("🎯 Comparaison multi-critères (radar)")
                 
                 # Sélection des métriques
@@ -2327,15 +2327,15 @@ def main():
                             radialaxis=dict(
                                 visible=True,
                                 range=[0, max([stats_df[metric].max() for metric in selected_metrics])],
-                                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                                tickfont=dict(size=12, color='#555555')  # Gris foncé visible sur les deux thèmes
                             ),
                             angularaxis=dict(
-                                tickfont=dict(size=12, color='white')  # Amélioration visibilité mode sombre
+                                tickfont=dict(size=12, color='#555555')  # Gris foncé visible sur les deux thèmes
                             )),
                         showlegend=True,
                         title="Comparaison multi-critères des échantillons",
                         height=600,
-                        font=dict(color='white')  # Amélioration visibilité mode sombre
+                        font=dict(color='#555555')  # Gris foncé pour tout le texte
                     )
                     
                     st.plotly_chart(fig_radar, use_container_width=True, key=generate_unique_key("comparison_radar_multicriteria"))
