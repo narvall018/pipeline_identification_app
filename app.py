@@ -242,6 +242,14 @@ st.markdown("""
     .pubchem-button:hover {
         background-color: #45a049;
     }
+    .welcome-card {
+        background-color: var(--secondary-background-color);
+        border: 2px solid var(--primary-color);
+        padding: 2rem;
+        margin: 2rem 0;
+        border-radius: 1rem;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -252,7 +260,7 @@ def generate_unique_key(base_key):
     timestamp = str(int(time.time() * 1000))[-6:]
     return f"{base_key}_{unique_id}_{timestamp}"
 
-@st.cache_data
+@st.cache_data(ttl=3600, max_entries=3)  # Cache optimisé
 def parse_list_column(series):
     """Convertit les colonnes de listes string en vraies listes"""
     def safe_eval(x):
@@ -272,7 +280,7 @@ def parse_list_column(series):
             return []
     return series.apply(safe_eval)
 
-@st.cache_data
+@st.cache_data(ttl=3600, max_entries=3)  # Cache optimisé
 def parse_dict_column(series):
     """Convertit les colonnes de dictionnaires string en vrais dictionnaires"""
     def safe_eval_dict(x):
@@ -288,7 +296,7 @@ def parse_dict_column(series):
             return {}
     return series.apply(safe_eval_dict)
 
-@st.cache_data
+@st.cache_data(ttl=1800)  # Cache optimisé
 def get_intensity_for_sample(row, sample_name):
     """Extrait l'intensité spécifique pour un échantillon donné"""
     try:
@@ -318,7 +326,7 @@ def get_intensity_for_sample(row, sample_name):
         # En cas d'erreur, retourner l'intensité générale
         return row.get('intensity', 0)
 
-@st.cache_data
+@st.cache_data(ttl=1800)  # Cache optimisé
 def count_unique_molecules(df, sample_filter=None, confidence_levels=None):
     """Compte les molécules uniques (pas les occurrences)"""
     filtered_df = df[df['match_name'].notna()].copy()
@@ -331,7 +339,7 @@ def count_unique_molecules(df, sample_filter=None, confidence_levels=None):
     
     return len(filtered_df['match_name'].unique())
 
-@st.cache_data
+@st.cache_data(ttl=1800)  # Cache optimisé
 def aggregate_molecules_by_name_enhanced(df, sample_filter=None):
     """Agrège les données par nom de molécule en conservant toutes les informations importantes et utilise les intensités par échantillon"""
     filtered_df = df[df['match_name'].notna()].copy()
@@ -403,7 +411,7 @@ def aggregate_molecules_by_name_enhanced(df, sample_filter=None):
     
     return pd.DataFrame(aggregated_data)
 
-@st.cache_data
+@st.cache_data(ttl=1800)  # Cache optimisé
 def aggregate_molecules_by_name(df, sample_filter=None):
     """Version standard pour la compatibilité"""
     return aggregate_molecules_by_name_enhanced(df, sample_filter)
@@ -433,7 +441,7 @@ def display_pubchem_link(molecule_name, smiles=None):
     """, unsafe_allow_html=True)
 
 # Fonctions de chargement des données avec cache optimisé
-@st.cache_data(ttl=7200)  # Cache pendant 2 heures
+@st.cache_data(ttl=7200, show_spinner="Chargement des données features...")  # Cache optimisé
 def load_features_data(uploaded_file):
     """Charge et traite le fichier features_complete.csv."""
     df = pd.read_csv(uploaded_file)
@@ -453,13 +461,13 @@ def load_features_data(uploaded_file):
     
     return df
 
-@st.cache_data(ttl=7200)  # Cache pendant 2 heures
+@st.cache_data(ttl=7200, show_spinner="Chargement de la matrice...")  # Cache optimisé
 def load_matrix_data(uploaded_file):
     """Charge le fichier feature_matrix.csv."""
     df = pd.read_csv(uploaded_file, index_col=0)
     return df
 
-@st.cache_data
+@st.cache_data(ttl=3600)  # Cache optimisé
 def calculate_detection_factor(df, samples_list, confidence_levels=None):
     """Calcule le facteur de détection par catégorie pour chaque échantillon avec filtrage par niveau de confiance - MOLÉCULES UNIQUES"""
     detection_factors = {}
@@ -1584,7 +1592,7 @@ def perform_kmeans_clustering(matrix_df):
 
 def plot_boxplot_by_category(df, samples_list):
     """Boxplots des intensités par catégorie"""
-    st.subheader("Distribution des intensités par catégorie")
+    st.subheader("📦 Distribution des intensités par catégorie")
     
     # Préparer les données
     intensity_data = []
@@ -1626,6 +1634,111 @@ def plot_boxplot_by_category(df, samples_list):
     )
     
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("boxplot_categories"))
+
+# NOUVELLE FONCTION : Boxplot par catégorie pour un échantillon spécifique
+def plot_sample_boxplot_by_category(df, sample_name):
+    """Boxplots des intensités par catégorie pour un échantillon spécifique"""
+    st.subheader(f"📦 Distribution des intensités par catégorie - {sample_name}")
+    
+    # Filtrer les données de l'échantillon
+    sample_data = df[df['samples'].str.contains(sample_name, na=False)]
+    identified_data = sample_data[sample_data['match_name'].notna()]
+    
+    if identified_data.empty:
+        st.warning(f"Aucune molécule identifiée dans l'échantillon {sample_name}")
+        return
+    
+    # Préparer les données avec intensités spécifiques
+    intensity_data = []
+    
+    for idx, row in identified_data.iterrows():
+        categories = row.get('categories', [])
+        if isinstance(categories, list):
+            # Utiliser l'intensité spécifique à l'échantillon
+            sample_intensity = get_intensity_for_sample(row, sample_name)
+            
+            for category in categories:
+                intensity_data.append({
+                    'Catégorie': category,
+                    'Intensité': sample_intensity,
+                    'log_Intensité': np.log10(sample_intensity) if sample_intensity > 0 else 0,
+                    'Molécule': row['match_name']
+                })
+    
+    if not intensity_data:
+        st.warning(f"Aucune donnée d'intensité par catégorie pour {sample_name}")
+        return
+    
+    intensity_df = pd.DataFrame(intensity_data)
+    
+    # Compter les molécules par catégorie
+    category_counts = intensity_df['Catégorie'].value_counts()
+    
+    # Filtrer pour ne garder que les catégories avec au moins 2 molécules
+    valid_categories = category_counts[category_counts >= 2].index.tolist()
+    
+    if not valid_categories:
+        st.warning("Pas assez de données pour créer des boxplots (minimum 2 molécules par catégorie)")
+        # Afficher un graphique en barres à la place
+        fig = px.bar(
+            category_counts.head(10),
+            x=category_counts.head(10).index,
+            y=category_counts.head(10).values,
+            title=f"Nombre de molécules par catégorie - {sample_name}",
+            color=category_counts.head(10).index,
+            color_discrete_sequence=DISTINCT_COLORS
+        )
+        fig.update_layout(
+            height=400,
+            xaxis_tickangle=-45,
+            showlegend=False,
+            xaxis_title="Catégorie",
+            yaxis_title="Nombre de molécules"
+        )
+        st.plotly_chart(fig, use_container_width=True, key=generate_unique_key(f"category_counts_{sample_name}"))
+        return
+    
+    # Filtrer les données pour les catégories valides
+    filtered_df = intensity_df[intensity_df['Catégorie'].isin(valid_categories)]
+    
+    # Prendre seulement les top 8 catégories pour la lisibilité
+    top_categories = category_counts[category_counts >= 2].head(8).index.tolist()
+    filtered_df = filtered_df[filtered_df['Catégorie'].isin(top_categories)]
+    
+    # Créer le boxplot
+    fig = px.box(
+        filtered_df,
+        x='Catégorie',
+        y='log_Intensité',
+        title=f"Distribution des intensités par catégorie - {sample_name} (intensités spécifiques, échelle log)",
+        color='Catégorie',
+        color_discrete_sequence=DISTINCT_COLORS,
+        hover_data=['Molécule', 'Intensité']
+    )
+    
+    fig.update_layout(
+        height=500,
+        xaxis_tickangle=-45,
+        showlegend=False,
+        xaxis_title="Catégorie",
+        yaxis_title="log10(Intensité spécifique)"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key(f"sample_boxplot_categories_{sample_name}"))
+    
+    # Afficher quelques statistiques
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Catégories représentées", len(top_categories))
+    
+    with col2:
+        most_abundant_cat = category_counts.head(1).index[0]
+        st.metric("Catégorie dominante", most_abundant_cat)
+    
+    with col3:
+        avg_intensity = filtered_df['Intensité'].mean()
+        st.metric("Intensité moyenne", f"{avg_intensity:.2e}")
 
 def show_confidence_levels_table():
     """Affiche le tableau des niveaux de confiance avec un style amélioré"""
@@ -1702,6 +1815,81 @@ def display_molecule_details_sidebar(molecule_data):
         if st.button("📊 Voir l'analyse complète"):
             st.session_state.selected_molecule_for_analysis = molecule_data.get('match_name')
 
+def show_home_page():
+    """Affiche la page d'accueil avec toutes les informations principales"""
+    # En-tête de bienvenue
+    st.markdown("""
+    <div class="welcome-card">
+        <h1>🧪 Bienvenue dans l'outil d'analyse HRMS</h1>
+        <p style="font-size: 1.2em; margin: 1rem 0;">
+            Analysez et visualisez vos données de spectrométrie de masse haute résolution
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Afficher les tableaux des niveaux de confiance
+    show_confidence_levels_table()
+    
+    st.markdown("---")
+    
+    # Instructions détaillées
+    st.markdown("""
+    ## 🎯 Guide d'utilisation
+    
+    ### 📁 Fichiers requis
+    
+    1. **features_complete.csv** (obligatoire)
+       - Contient les résultats d'identification MS
+       - Colonnes requises : mz, retention_time, intensity, match_name, confidence_level, etc.
+       - **Nouvelles colonnes écotoxicologiques** : daphnia_LC50_48_hr_ug/L, algae_EC50_72_hr_ug/L, pimephales_LC50_96_hr_ug/L
+       - **Colonnes d'intensités spécifiques** : intensities_by_sample, sample_names_order
+    
+    2. **feature_matrix.csv** (optionnel)
+       - Matrice d'intensités pour analyses statistiques
+       - Format : échantillons en lignes, features en colonnes
+    
+    """)
+    
+    # Affichage de la base de données de référence
+    st.subheader("📚 Base de données de référence")
+    
+    # Créer un DataFrame pour la base de données
+    db_df = pd.DataFrame([
+        {'Catégorie': cat, 'Nombre_molécules': count, 'Pourcentage': f"{count/sum(DATABASE_CATEGORIES.values())*100:.1f}%"}
+        for cat, count in sorted(DATABASE_CATEGORIES.items(), key=lambda x: x[1], reverse=True)
+    ])
+    
+    # Affichage du tableau
+    st.dataframe(db_df, use_container_width=True)
+    
+    # Graphique de la distribution
+    fig_db = px.pie(
+        db_df.head(10),  # Top 10 pour la lisibilité
+        values='Nombre_molécules',
+        names='Catégorie',
+        title="Distribution des 10 principales catégories dans la base de données",
+        color_discrete_sequence=DISTINCT_COLORS[:10]
+    )
+    fig_db.update_layout(height=500)
+    st.plotly_chart(fig_db, use_container_width=True, key=generate_unique_key("database_distribution_pie"))
+    
+    # Métriques de la base
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total molécules", "72,577")
+    
+    with col2:
+        st.metric("Catégories", len(DATABASE_CATEGORIES))
+    
+    with col3:
+        largest_cat = max(DATABASE_CATEGORIES.items(), key=lambda x: x[1])
+        st.metric("Plus grande catégorie", f"{largest_cat[0]} ({largest_cat[1]:,})")
+    
+    with col4:
+        smallest_cat = min(DATABASE_CATEGORIES.items(), key=lambda x: x[1])
+        st.metric("Plus petite catégorie", f"{smallest_cat[0]} ({smallest_cat[1]})")
+
 # Interface principale optimisée avec persistance des données
 def main():
     st.title("🧪 Analyse et visualisation des données de HRMS")
@@ -1760,23 +1948,62 @@ def main():
             matrix_df = None
             st.session_state.matrix_df = None
     
-    # Navigation principale - Utiliser les données de session
+    # Navigation principale - MODIFICATION ICI : toujours afficher tous les onglets
+    tabs = st.tabs([
+        "🏠 Accueil",
+        "📊 Vue d'ensemble", 
+        "🔍 Analyse par échantillon", 
+        "🧬 Molécules individuelles",
+        "📡 Facteurs de détection",
+        "⚖️ Comparaison échantillons",
+        "📈 Analyses statistiques",
+        "📋 Rapports & Export",
+        "ℹ️ Système de confiance"
+    ])
+    
+    with tabs[0]:  # NOUVEAU : Onglet Accueil permanent
+        if features_df is None:
+            show_home_page()
+        else:
+            st.markdown("""
+            <div class="welcome-card">
+                <h2>🎉 Données chargées avec succès !</h2>
+                <p style="font-size: 1.1em;">
+                    Vos données sont maintenant disponibles dans tous les onglets d'analyse.
+                    Explorez les différentes sections pour analyser vos résultats de spectrométrie de masse.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Résumé rapide des données chargées
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total features", len(features_df))
+            
+            with col2:
+                identified = len(features_df[features_df['match_name'].notna()]['match_name'].unique())
+                st.metric("Molécules identifiées", identified)
+            
+            with col3:
+                samples_list = list(set([s for samples in features_df['samples'].dropna() 
+                                       for s in samples.split(',')]))
+                st.metric("Échantillons", len(samples_list))
+            
+            with col4:
+                matrix_status = "✅ Chargée" if matrix_df is not None else "❌ Non chargée"
+                st.metric("Matrice", matrix_status)
+            
+            # Afficher quand même les informations de référence
+            st.markdown("---")
+            show_home_page()
+    
+    # Utiliser les données de session pour tous les autres onglets
     if st.session_state.features_df is not None:
         features_df = st.session_state.features_df
         matrix_df = st.session_state.matrix_df
         
-        tabs = st.tabs([
-            "📊 Vue d'ensemble", 
-            "🔍 Analyse par échantillon", 
-            "🧬 Molécules individuelles",
-            "📡 Facteurs de détection",
-            "⚖️ Comparaison échantillons",
-            "📈 Analyses statistiques",
-            "📋 Rapports & Export",
-            "ℹ️ Système de confiance"
-        ])
-        
-        with tabs[0]:  # Vue d'ensemble
+        with tabs[1]:  # Vue d'ensemble
             st.header("Vue d'ensemble du dataset")
             
             # Info sur les molécules uniques
@@ -1873,8 +2100,14 @@ def main():
                         fig_ms2.add_vline(x=0.4, line_dash="dash", line_color=DISTINCT_COLORS[3],
                                         annotation_text="Bon (≥0.4)")
                         st.plotly_chart(fig_ms2, use_container_width=True, key=generate_unique_key("overview_ms2_dist"))
+            
+            # NOUVEAU : Ajout du graphique d'intensité par catégories depuis l'onglet statistiques
+            st.markdown("---")
+            samples_list = list(set([s for samples in features_df['samples'].dropna() 
+                                   for s in samples.split(',')]))
+            plot_boxplot_by_category(features_df, samples_list)
         
-        with tabs[1]:  # Analyse par échantillon
+        with tabs[2]:  # Analyse par échantillon
             st.header("Analyse détaillée par échantillon")
             
             # Info sur les molécules uniques - AGRÉGATION PAR DÉFAUT
@@ -1921,6 +2154,10 @@ def main():
                         color_discrete_sequence=DISTINCT_COLORS
                     )
                     st.plotly_chart(fig_rt, use_container_width=True, key=generate_unique_key(f"sample_rt_profile_{selected_sample}"))
+                
+                # NOUVEAU : Boxplot par catégorie pour l'échantillon spécifique
+                st.markdown("---")
+                plot_sample_boxplot_by_category(features_df, selected_sample)
                 
                 # Bubble plot pour molécules avec choix de niveaux
                 st.subheader(f"🫧 Molécules uniques par niveau - {selected_sample}")
@@ -2072,7 +2309,7 @@ def main():
                 else:
                     st.warning("Aucune molécule identifiée dans cet échantillon")
         
-        with tabs[2]:  # Molécules individuelles
+        with tabs[3]:  # Molécules individuelles
             st.header("Analyse détaillée des molécules")
             
             # Info sur les molécules uniques
@@ -2281,7 +2518,7 @@ def main():
             else:
                 st.warning("Aucune molécule identifiée dans le dataset")
         
-        with tabs[3]:  # Facteurs de détection
+        with tabs[4]:  # Facteurs de détection
             st.header("Facteurs de détection par catégorie")
             
             # Info sur les molécules uniques
@@ -2421,7 +2658,7 @@ def main():
             
             plot_category_distribution_radar(features_df, samples_list, confidence_levels_radar)
         
-        with tabs[4]:  # Comparaison échantillons
+        with tabs[5]:  # Comparaison échantillons
             st.header("Comparaison multi-échantillons")
             
             # Info sur les molécules uniques
@@ -2609,7 +2846,7 @@ def main():
             else:
                 st.warning("Au moins 2 échantillons sont nécessaires pour la comparaison")
         
-        with tabs[5]:  # Analyses statistiques - NOUVELLES FONCTIONNALITÉS
+        with tabs[6]:  # Analyses statistiques - GRAPHIQUE DÉPLACÉ VERS VUE D'ENSEMBLE
             st.header("Analyses statistiques avancées")
             
             if matrix_df is not None:
@@ -2618,7 +2855,6 @@ def main():
                     "📊 PCA & t-SNE",
                     "🔍 Clustering",
                     "📈 Corrélations",
-                    "📦 Boxplots par catégories", 
                     "🎨 Heatmaps"
                 ])
                 
@@ -2717,16 +2953,7 @@ def main():
                             )
                             st.plotly_chart(fig_corr_dist, use_container_width=True, key=generate_unique_key("correlation_distribution"))
                 
-                with stat_tabs[3]:  # Boxplots & Outliers
-                    st.subheader("📦 Analyse des distributions par catégories")
-                    
-                    # Boxplots par catégorie
-                    if features_df is not None:
-                        plot_boxplot_by_category(features_df, samples_list)
-                        
-
-                
-                with stat_tabs[4]:  # Heatmaps
+                with stat_tabs[3]:  # Heatmaps
                     st.subheader("🎨 Heatmaps avancées")
                     
                     # Heatmap des intensités
@@ -2833,7 +3060,7 @@ def main():
                 - Valeurs : intensités
                 """)
         
-        with tabs[6]:  # Rapports & Export
+        with tabs[7]:  # Rapports & Export
             st.header("Génération de rapports et export")
             
             # Info sur les molécules uniques
@@ -3141,7 +3368,7 @@ def main():
                         mime="application/json"
                     )
         
-        with tabs[7]:  # Système de confiance
+        with tabs[8]:  # Système de confiance
             st.header("Système de niveaux de confiance")
             
             # Info sur les molécules uniques
@@ -3268,71 +3495,30 @@ def main():
                             st.plotly_chart(fig_ms2, use_container_width=True, key=generate_unique_key(f"ms2_score_dist_level_{selected_level}"))
     
     else:
-        # Page d'accueil si aucun fichier n'est chargé
-        st.info("👆 Veuillez charger le fichier **features_complete.csv** pour commencer l'analyse")
+        # Affichage pour les autres onglets quand aucune donnée n'est chargée
+        with tabs[1]:
+            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
         
-        # Afficher les tableaux des niveaux de confiance
-        show_confidence_levels_table()
+        with tabs[2]:
+            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
         
-        st.markdown("---")
+        with tabs[3]:
+            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
         
-        # Instructions détaillées
-        st.markdown("""
-        ## 🎯 Guide d'utilisation
+        with tabs[4]:
+            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
         
-        ### 📁 Fichiers requis
+        with tabs[5]:
+            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
         
-        1. **features_complete.csv** (obligatoire)
-           - Contient les résultats d'identification MS
-           - Colonnes requises : mz, retention_time, intensity, match_name, confidence_level, etc.
-           - **Nouvelles colonnes écotoxicologiques** : daphnia_LC50_48_hr_ug/L, algae_EC50_72_hr_ug/L, pimephales_LC50_96_hr_ug/L
-           - **Colonnes d'intensités spécifiques** : intensities_by_sample, sample_names_order
+        with tabs[6]:
+            st.warning("⚠️ Veuillez charger les fichiers de données dans l'onglet 'Accueil' pour accéder aux analyses statistiques")
         
-        2. **feature_matrix.csv** (optionnel)
-           - Matrice d'intensités pour analyses statistiques
-           - Format : échantillons en lignes, features en colonnes
+        with tabs[7]:
+            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder aux fonctions d'export")
         
-        """)
-        
-        # Affichage de la base de données de référence
-        st.subheader("📚 Base de données de référence")
-        
-        # Créer un DataFrame pour la base de données
-        db_df = pd.DataFrame([
-            {'Catégorie': cat, 'Nombre_molécules': count, 'Pourcentage': f"{count/sum(DATABASE_CATEGORIES.values())*100:.1f}%"}
-            for cat, count in sorted(DATABASE_CATEGORIES.items(), key=lambda x: x[1], reverse=True)
-        ])
-        
-        # Affichage du tableau
-        st.dataframe(db_df, use_container_width=True)
-        
-        # Graphique de la distribution
-        fig_db = px.pie(
-            db_df.head(10),  # Top 10 pour la lisibilité
-            values='Nombre_molécules',
-            names='Catégorie',
-            title="Distribution des 10 principales catégories dans la base de données",
-            color_discrete_sequence=DISTINCT_COLORS[:10]
-        )
-        fig_db.update_layout(height=500)
-        st.plotly_chart(fig_db, use_container_width=True, key=generate_unique_key("database_distribution_pie"))
-        
-        # Métriques de la base
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total molécules", "72,577")
-        
-        with col2:
-            st.metric("Catégories", len(DATABASE_CATEGORIES))
-        
-        with col3:
-            largest_cat = max(DATABASE_CATEGORIES.items(), key=lambda x: x[1])
-            st.metric("Plus grande catégorie", f"{largest_cat[0]} ({largest_cat[1]:,})")
-        
-        with col4:
-            smallest_cat = min(DATABASE_CATEGORIES.items(), key=lambda x: x[1])
-            st.metric("Plus petite catégorie", f"{smallest_cat[0]} ({smallest_cat[1]})")
+        with tabs[8]:
+            show_confidence_levels_table()
 
 if __name__ == "__main__":
     main()
