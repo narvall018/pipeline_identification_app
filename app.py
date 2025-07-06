@@ -250,6 +250,12 @@ st.markdown("""
         border-radius: 1rem;
         text-align: center;
     }
+    .nav-radio {
+        background-color: var(--secondary-background-color);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1890,7 +1896,7 @@ def show_home_page():
         smallest_cat = min(DATABASE_CATEGORIES.items(), key=lambda x: x[1])
         st.metric("Plus petite catégorie", f"{smallest_cat[0]} ({smallest_cat[1]})")
 
-# Interface principale optimisée avec persistance des données
+# Interface principale optimisée avec persistance des données et navigation stable
 def main():
     st.title("🧪 Analyse et visualisation des données de HRMS")
     st.markdown("---")
@@ -1902,6 +1908,8 @@ def main():
         st.session_state.matrix_df = None
     if 'current_tab' not in st.session_state:
         st.session_state.current_tab = 0
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = "🏠 Accueil"
     
     # Sidebar pour les uploads uniquement
     st.sidebar.header("📁 Chargement des fichiers")
@@ -1948,8 +1956,8 @@ def main():
             matrix_df = None
             st.session_state.matrix_df = None
     
-    # Navigation principale - MODIFICATION ICI : toujours afficher tous les onglets
-    tabs = st.tabs([
+    # Navigation avec état persistant - SOLUTION AU PROBLÈME DE RETOUR À L'ACCUEIL
+    tab_names = [
         "🏠 Accueil",
         "📊 Vue d'ensemble", 
         "🔍 Analyse par échantillon", 
@@ -1959,51 +1967,71 @@ def main():
         "📈 Analyses statistiques",
         "📋 Rapports & Export",
         "ℹ️ Système de confiance"
-    ])
+    ]
     
-    with tabs[0]:  # NOUVEAU : Onglet Accueil permanent
-        if features_df is None:
-            show_home_page()
-        else:
-            st.markdown("""
-            <div class="welcome-card">
-                <h2>🎉 Données chargées avec succès !</h2>
-                <p style="font-size: 1.1em;">
-                    Vos données sont maintenant disponibles dans tous les onglets d'analyse.
-                    Explorez les différentes sections pour analyser vos résultats de spectrométrie de masse.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Résumé rapide des données chargées
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("Total features", len(features_df))
-            
-            with col2:
-                identified = len(features_df[features_df['match_name'].notna()]['match_name'].unique())
-                st.metric("Molécules identifiées", identified)
-            
-            with col3:
-                samples_list = list(set([s for samples in features_df['samples'].dropna() 
-                                       for s in samples.split(',')]))
-                st.metric("Échantillons", len(samples_list))
-            
-            with col4:
-                matrix_status = "✅ Chargée" if matrix_df is not None else "❌ Non chargée"
-                st.metric("Matrice", matrix_status)
-            
-            # Afficher quand même les informations de référence
-            st.markdown("---")
-            show_home_page()
+    # Widget de navigation qui préserve l'état
+    st.markdown("""
+    <div class="nav-radio">
+        <p><strong>🧭 Navigation</strong></p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Utiliser les données de session pour tous les autres onglets
-    if st.session_state.features_df is not None:
-        features_df = st.session_state.features_df
-        matrix_df = st.session_state.matrix_df
+    # Utiliser un selectbox au lieu de tabs pour une navigation stable
+    selected_tab = st.selectbox(
+        "Choisir une section:",
+        tab_names,
+        index=tab_names.index(st.session_state.active_tab) if st.session_state.active_tab in tab_names else 0,
+        key="navigation_selectbox"
+    )
+    
+    # Mettre à jour l'onglet actif
+    st.session_state.active_tab = selected_tab
+    
+    # Fonction pour afficher le contenu selon l'onglet sélectionné
+    def show_tab_content(tab_name):
         
-        with tabs[1]:  # Vue d'ensemble
+        if tab_name == "🏠 Accueil":  # Onglet Accueil permanent
+            if features_df is None:
+                show_home_page()
+            else:
+                st.markdown("""
+                <div class="welcome-card">
+                    <h2>🎉 Données chargées avec succès !</h2>
+                    <p style="font-size: 1.1em;">
+                        Vos données sont maintenant disponibles dans toutes les sections d'analyse.
+                        Explorez les différentes sections pour analyser vos résultats de spectrométrie de masse.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Résumé rapide des données chargées
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Total features", len(features_df))
+                
+                with col2:
+                    identified = len(features_df[features_df['match_name'].notna()]['match_name'].unique())
+                    st.metric("Molécules identifiées", identified)
+                
+                with col3:
+                    samples_list = list(set([s for samples in features_df['samples'].dropna() 
+                                           for s in samples.split(',')]))
+                    st.metric("Échantillons", len(samples_list))
+                
+                with col4:
+                    matrix_status = "✅ Chargée" if matrix_df is not None else "❌ Non chargée"
+                    st.metric("Matrice", matrix_status)
+                
+                # Afficher quand même les informations de référence
+                st.markdown("---")
+                show_home_page()
+        
+        elif tab_name == "📊 Vue d'ensemble":  # Vue d'ensemble
+            if features_df is None:
+                st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans la section 'Accueil' pour accéder à l'analyse")
+                return
+            
             st.header("Vue d'ensemble du dataset")
             
             # Info sur les molécules uniques
@@ -2107,7 +2135,11 @@ def main():
                                    for s in samples.split(',')]))
             plot_boxplot_by_category(features_df, samples_list)
         
-        with tabs[2]:  # Analyse par échantillon
+        elif tab_name == "🔍 Analyse par échantillon":  # Analyse par échantillon
+            if features_df is None:
+                st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans la section 'Accueil' pour accéder à l'analyse")
+                return
+            
             st.header("Analyse détaillée par échantillon")
             
             # Info sur les molécules uniques - AGRÉGATION PAR DÉFAUT
@@ -2309,7 +2341,11 @@ def main():
                 else:
                     st.warning("Aucune molécule identifiée dans cet échantillon")
         
-        with tabs[3]:  # Molécules individuelles
+        elif tab_name == "🧬 Molécules individuelles":  # Molécules individuelles
+            if features_df is None:
+                st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans la section 'Accueil' pour accéder à l'analyse")
+                return
+            
             st.header("Analyse détaillée des molécules")
             
             # Info sur les molécules uniques
@@ -2518,7 +2554,11 @@ def main():
             else:
                 st.warning("Aucune molécule identifiée dans le dataset")
         
-        with tabs[4]:  # Facteurs de détection
+        elif tab_name == "📡 Facteurs de détection":  # Facteurs de détection
+            if features_df is None:
+                st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans la section 'Accueil' pour accéder à l'analyse")
+                return
+            
             st.header("Facteurs de détection par catégorie")
             
             # Info sur les molécules uniques
@@ -2658,7 +2698,11 @@ def main():
             
             plot_category_distribution_radar(features_df, samples_list, confidence_levels_radar)
         
-        with tabs[5]:  # Comparaison échantillons
+        elif tab_name == "⚖️ Comparaison échantillons":  # Comparaison échantillons
+            if features_df is None:
+                st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans la section 'Accueil' pour accéder à l'analyse")
+                return
+            
             st.header("Comparaison multi-échantillons")
             
             # Info sur les molécules uniques
@@ -2846,19 +2890,18 @@ def main():
             else:
                 st.warning("Au moins 2 échantillons sont nécessaires pour la comparaison")
         
-        with tabs[6]:  # Analyses statistiques - GRAPHIQUE DÉPLACÉ VERS VUE D'ENSEMBLE
-            st.header("Analyses statistiques avancées")
-            
+        elif tab_name == "📈 Analyses statistiques":  # Analyses statistiques
             if matrix_df is not None:
-                # Sous-onglets pour les différentes analyses
-                stat_tabs = st.tabs([
-                    "📊 PCA & t-SNE",
-                    "🔍 Clustering",
-                    "📈 Corrélations",
-                    "🎨 Heatmaps"
-                ])
+                st.header("Analyses statistiques avancées")
                 
-                with stat_tabs[0]:  # PCA & t-SNE
+                # Sous-navigation pour les analyses statistiques
+                stat_section = st.selectbox(
+                    "Choisir une analyse:",
+                    ["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"],
+                    key="stat_navigation"
+                )
+                
+                if stat_section == "📊 PCA & t-SNE":
                     st.subheader("📊 Analyse en Composantes Principales (PCA)")
                     
                     col1, col2 = st.columns([1, 1])
@@ -2899,7 +2942,7 @@ def main():
                     st.subheader("🌐 Analyse t-SNE")
                     plot_tsne_analysis(matrix_df)
                 
-                with stat_tabs[1]:  # Clustering
+                elif stat_section == "🔍 Clustering":
                     st.subheader("🔍 Analyses de clustering")
                     
                     # K-means clustering
@@ -2916,7 +2959,7 @@ def main():
                                                for s in samples.split(',')]))
                         plot_hierarchical_clustering(features_df, samples_list)
                 
-                with stat_tabs[2]:  # Corrélations
+                elif stat_section == "📈 Corrélations":
                     st.subheader("📈 Analyses de corrélation")
                     
                     # Matrice de corrélation
@@ -2953,7 +2996,7 @@ def main():
                             )
                             st.plotly_chart(fig_corr_dist, use_container_width=True, key=generate_unique_key("correlation_distribution"))
                 
-                with stat_tabs[3]:  # Heatmaps
+                elif stat_section == "🎨 Heatmaps":
                     st.subheader("🎨 Heatmaps avancées")
                     
                     # Heatmap des intensités
@@ -3060,7 +3103,11 @@ def main():
                 - Valeurs : intensités
                 """)
         
-        with tabs[7]:  # Rapports & Export
+        elif tab_name == "📋 Rapports & Export":  # Rapports & Export
+            if features_df is None:
+                st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans la section 'Accueil' pour accéder aux fonctions d'export")
+                return
+            
             st.header("Génération de rapports et export")
             
             # Info sur les molécules uniques
@@ -3368,157 +3415,137 @@ def main():
                         mime="application/json"
                     )
         
-        with tabs[8]:  # Système de confiance
-            st.header("Système de niveaux de confiance")
-            
-            # Info sur les molécules uniques
-            st.info("ℹ️ Analyses basées sur les molécules uniques. Les statistiques reflètent les meilleures identifications.")
-            
-            # Vue d'ensemble avec le nouveau tableau stylé
-            show_confidence_levels_table()
-            
-            st.markdown("---")
-            
-            # Statistiques des niveaux dans le dataset
-            st.subheader("📊 Distribution des niveaux dans vos données")
-            
-            if 'confidence_level' in features_df.columns:
-                # Compter les molécules uniques par niveau
-                level_counts = {}
-                for level in range(1, 6):
-                    level_molecules = features_df[features_df['confidence_level'] == level]['match_name'].dropna().unique()
-                    level_counts[level] = len(level_molecules)
+        elif tab_name == "ℹ️ Système de confiance":  # Système de confiance
+            if features_df is not None:
+                st.header("Système de niveaux de confiance")
                 
-                # Graphique en entonnoir des niveaux
-                fig = go.Figure(go.Funnel(
-                    y=[f"Niveau {i}" for i in level_counts.keys()],
-                    x=list(level_counts.values()),
-                    textposition="inside",
-                    textinfo="value+percent total",
-                    marker=dict(color=DISTINCT_COLORS[:len(level_counts)])
-                ))
+                # Info sur les molécules uniques
+                st.info("ℹ️ Analyses basées sur les molécules uniques. Les statistiques reflètent les meilleures identifications.")
                 
-                fig.update_layout(
-                    title="Distribution des niveaux de confiance dans le dataset (molécules uniques)",
-                    height=400
-                )
+                # Vue d'ensemble avec le nouveau tableau stylé
+                show_confidence_levels_table()
                 
-                st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("confidence_funnel_unique"))
+                st.markdown("---")
                 
-                # Analyse par niveau
-                st.subheader("🔍 Analyse détaillée par niveau")
+                # Statistiques des niveaux dans le dataset
+                st.subheader("📊 Distribution des niveaux dans vos données")
                 
-                available_levels = [level for level, count in level_counts.items() if count > 0]
-                selected_level = st.selectbox(
-                    "Sélectionner un niveau pour analyse",
-                    available_levels,
-                    key="selected_level_analysis"
-                )
-                
-                level_data = features_df[features_df['confidence_level'] == selected_level]
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    unique_molecules = len(level_data['match_name'].dropna().unique())
-                    st.metric("Molécules uniques", unique_molecules)
-                
-                with col2:
-                    avg_ms2 = level_data['ms2_similarity_score'].mean()
-                    st.metric("Score MS2 moyen", f"{avg_ms2:.3f}")
-                
-                with col3:
-                    avg_mz_error = level_data['mz_error_ppm'].abs().mean()
-                    st.metric("Erreur m/z moyenne", f"{avg_mz_error:.2f} ppm")
-                
-                with col4:
-                    avg_intensity = level_data['intensity'].mean()
-                    st.metric("Intensité moyenne", f"{avg_intensity:.2e}")
-                
-                # Top molécules par niveau (agrégées)
-                st.subheader(f"Top 10 molécules uniques - Niveau {selected_level}")
-                
-                if not level_data.empty:
-                    # Agréger les données par molécule
-                    aggregated_level = aggregate_molecules_by_name_enhanced(level_data)
+                if 'confidence_level' in features_df.columns:
+                    # Compter les molécules uniques par niveau
+                    level_counts = {}
+                    for level in range(1, 6):
+                        level_molecules = features_df[features_df['confidence_level'] == level]['match_name'].dropna().unique()
+                        level_counts[level] = len(level_molecules)
                     
-                    if not aggregated_level.empty:
-                        display_cols = ['match_name', 'total_intensity', 'intensity', 'ms2_similarity_score', 'mz_error_ppm', 'samples']
-                        available_cols = [col for col in display_cols if col in aggregated_level.columns]
+                    # Graphique en entonnoir des niveaux
+                    fig = go.Figure(go.Funnel(
+                        y=[f"Niveau {i}" for i in level_counts.keys()],
+                        x=list(level_counts.values()),
+                        textposition="inside",
+                        textinfo="value+percent total",
+                        marker=dict(color=DISTINCT_COLORS[:len(level_counts)])
+                    ))
+                    
+                    fig.update_layout(
+                        title="Distribution des niveaux de confiance dans le dataset (molécules uniques)",
+                        height=400
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("confidence_funnel_unique"))
+                    
+                    # Analyse par niveau
+                    st.subheader("🔍 Analyse détaillée par niveau")
+                    
+                    available_levels = [level for level, count in level_counts.items() if count > 0]
+                    selected_level = st.selectbox(
+                        "Sélectionner un niveau pour analyse",
+                        available_levels,
+                        key="selected_level_analysis"
+                    )
+                    
+                    level_data = features_df[features_df['confidence_level'] == selected_level]
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        unique_molecules = len(level_data['match_name'].dropna().unique())
+                        st.metric("Molécules uniques", unique_molecules)
+                    
+                    with col2:
+                        avg_ms2 = level_data['ms2_similarity_score'].mean()
+                        st.metric("Score MS2 moyen", f"{avg_ms2:.3f}")
+                    
+                    with col3:
+                        avg_mz_error = level_data['mz_error_ppm'].abs().mean()
+                        st.metric("Erreur m/z moyenne", f"{avg_mz_error:.2f} ppm")
+                    
+                    with col4:
+                        avg_intensity = level_data['intensity'].mean()
+                        st.metric("Intensité moyenne", f"{avg_intensity:.2e}")
+                    
+                    # Top molécules par niveau (agrégées)
+                    st.subheader(f"Top 10 molécules uniques - Niveau {selected_level}")
+                    
+                    if not level_data.empty:
+                        # Agréger les données par molécule
+                        aggregated_level = aggregate_molecules_by_name_enhanced(level_data)
                         
-                        top_molecules = aggregated_level.nlargest(10, 'total_intensity')[available_cols]
-                        
-                        # Formatter les adduits
-                        if 'match_adduct' in aggregated_level.columns:
-                            top_molecules_display = top_molecules.copy()
-                            top_molecules_display['adduits'] = aggregated_level.nlargest(10, 'total_intensity')['match_adduct'].apply(
-                                lambda x: ', '.join(x) if isinstance(x, list) else str(x)
-                            )
-                            st.dataframe(top_molecules_display.round(3), use_container_width=True)
-                        else:
-                            st.dataframe(top_molecules.round(3), use_container_width=True)
-                
-                # Analyse des critères par niveau
-                st.subheader(f"📈 Analyse des critères - Niveau {selected_level}")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # Distribution des erreurs m/z pour ce niveau
-                    if 'mz_error_ppm' in level_data.columns and not level_data.empty:
-                        fig_error = px.histogram(
-                            level_data,
-                            x='mz_error_ppm',
-                            nbins=20,
-                            title=f"Distribution erreurs m/z - Niveau {selected_level}",
-                            labels={'mz_error_ppm': 'Erreur m/z (ppm)'},
-                            color_discrete_sequence=DISTINCT_COLORS
-                        )
-                        fig_error.add_vline(x=5, line_dash="dash", line_color=DISTINCT_COLORS[1])
-                        st.plotly_chart(fig_error, use_container_width=True, key=generate_unique_key(f"mz_error_dist_level_{selected_level}"))
-                
-                with col2:
-                    # Distribution des scores MS2 pour ce niveau
-                    if 'ms2_similarity_score' in level_data.columns and not level_data.empty:
-                        ms2_level_data = level_data[level_data['ms2_similarity_score'] > 0]
-                        if not ms2_level_data.empty:
-                            fig_ms2 = px.histogram(
-                                ms2_level_data,
-                                x='ms2_similarity_score',
+                        if not aggregated_level.empty:
+                            display_cols = ['match_name', 'total_intensity', 'intensity', 'ms2_similarity_score', 'mz_error_ppm', 'samples']
+                            available_cols = [col for col in display_cols if col in aggregated_level.columns]
+                            
+                            top_molecules = aggregated_level.nlargest(10, 'total_intensity')[available_cols]
+                            
+                            # Formatter les adduits
+                            if 'match_adduct' in aggregated_level.columns:
+                                top_molecules_display = top_molecules.copy()
+                                top_molecules_display['adduits'] = aggregated_level.nlargest(10, 'total_intensity')['match_adduct'].apply(
+                                    lambda x: ', '.join(x) if isinstance(x, list) else str(x)
+                                )
+                                st.dataframe(top_molecules_display.round(3), use_container_width=True)
+                            else:
+                                st.dataframe(top_molecules.round(3), use_container_width=True)
+                    
+                    # Analyse des critères par niveau
+                    st.subheader(f"📈 Analyse des critères - Niveau {selected_level}")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Distribution des erreurs m/z pour ce niveau
+                        if 'mz_error_ppm' in level_data.columns and not level_data.empty:
+                            fig_error = px.histogram(
+                                level_data,
+                                x='mz_error_ppm',
                                 nbins=20,
-                                title=f"Distribution scores MS2 - Niveau {selected_level}",
-                                labels={'ms2_similarity_score': 'Score MS2'},
+                                title=f"Distribution erreurs m/z - Niveau {selected_level}",
+                                labels={'mz_error_ppm': 'Erreur m/z (ppm)'},
                                 color_discrete_sequence=DISTINCT_COLORS
                             )
-                            fig_ms2.add_vline(x=0.7, line_dash="dash", line_color=DISTINCT_COLORS[2])
-                            fig_ms2.add_vline(x=0.4, line_dash="dash", line_color=DISTINCT_COLORS[3])
-                            st.plotly_chart(fig_ms2, use_container_width=True, key=generate_unique_key(f"ms2_score_dist_level_{selected_level}"))
+                            fig_error.add_vline(x=5, line_dash="dash", line_color=DISTINCT_COLORS[1])
+                            st.plotly_chart(fig_error, use_container_width=True, key=generate_unique_key(f"mz_error_dist_level_{selected_level}"))
+                    
+                    with col2:
+                        # Distribution des scores MS2 pour ce niveau
+                        if 'ms2_similarity_score' in level_data.columns and not level_data.empty:
+                            ms2_level_data = level_data[level_data['ms2_similarity_score'] > 0]
+                            if not ms2_level_data.empty:
+                                fig_ms2 = px.histogram(
+                                    ms2_level_data,
+                                    x='ms2_similarity_score',
+                                    nbins=20,
+                                    title=f"Distribution scores MS2 - Niveau {selected_level}",
+                                    labels={'ms2_similarity_score': 'Score MS2'},
+                                    color_discrete_sequence=DISTINCT_COLORS
+                                )
+                                fig_ms2.add_vline(x=0.7, line_dash="dash", line_color=DISTINCT_COLORS[2])
+                                fig_ms2.add_vline(x=0.4, line_dash="dash", line_color=DISTINCT_COLORS[3])
+                                st.plotly_chart(fig_ms2, use_container_width=True, key=generate_unique_key(f"ms2_score_dist_level_{selected_level}"))
+            else:
+                show_confidence_levels_table()
     
-    else:
-        # Affichage pour les autres onglets quand aucune donnée n'est chargée
-        with tabs[1]:
-            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
-        
-        with tabs[2]:
-            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
-        
-        with tabs[3]:
-            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
-        
-        with tabs[4]:
-            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
-        
-        with tabs[5]:
-            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder à l'analyse")
-        
-        with tabs[6]:
-            st.warning("⚠️ Veuillez charger les fichiers de données dans l'onglet 'Accueil' pour accéder aux analyses statistiques")
-        
-        with tabs[7]:
-            st.warning("⚠️ Veuillez charger le fichier **features_complete.csv** dans l'onglet 'Accueil' pour accéder aux fonctions d'export")
-        
-        with tabs[8]:
-            show_confidence_levels_table()
+    # Afficher le contenu de l'onglet sélectionné
+    show_tab_content(selected_tab)
 
 if __name__ == "__main__":
     main()
