@@ -800,7 +800,7 @@ def plot_level1_bubble_plot_sample(df, sample_name):
             options=available_levels,
             default=[1],
             help="Sélectionnez les niveaux à inclure",
-            key=f"bubble_levels_{sample_name}_{generate_unique_key('sample_bubble')}"
+            key=f"bubble_levels_{sample_name}_fixed"  # CLÉ FIXE avec nom d'échantillon
         )
     
     with col2:
@@ -848,7 +848,7 @@ def plot_level1_bubble_plot_sample(df, sample_name):
         yaxis_title=f"Molécules (Niveaux {selected_levels})"
     )
     
-    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key(f"level_bubble_{sample_name}"))
+    st.plotly_chart(fig, use_container_width=True, key=f"level_bubble_{sample_name}_fixed")  # CLÉ FIXE avec nom d'échantillon
     
     # Afficher quelques statistiques
     col1, col2, col3 = st.columns(3)
@@ -1222,7 +1222,7 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
             "Sélection rapide",
             options=list(preset_options.keys()),
             index=2,  # Par défaut "Niveaux 1+2+3"
-            key=f"preset_confidence_levels_{generate_unique_key('preset_conf')}"
+            key="preset_confidence_levels_fixed"  # Clé FIXE au lieu de dynamique
         )
         
         selected_levels_from_preset = preset_options[preset_choice]
@@ -1234,11 +1234,11 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
             options=[1, 2, 3, 4, 5],
             default=selected_levels_from_preset,
             help="Personnalisez votre sélection de niveaux",
-            key=f"manual_confidence_levels_{generate_unique_key('manual_conf')}"
+            key="manual_confidence_levels_fixed"  # Clé FIXE au lieu de dynamique
         )
         
         # Utiliser la sélection manuelle si elle diffère du preset
-        if set(manual_levels) != set(selected_levels_from_preset):
+        if manual_levels:  # S'assurer que manual_levels n'est pas vide
             selected_levels_final = manual_levels
         else:
             selected_levels_final = selected_levels_from_preset
@@ -1280,7 +1280,7 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
     )
     
     fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("confidence_comparison_across_samples_filtered"))
+    st.plotly_chart(fig, use_container_width=True, key="confidence_comparison_across_samples_fixed")  # Clé FIXE
 
 def plot_level1_bubble_plot(df, samples_list):
     """Bubble plot pour les molécules avec choix de niveaux de confiance"""
@@ -1297,7 +1297,7 @@ def plot_level1_bubble_plot(df, samples_list):
             options=available_levels,
             default=[1],
             help="Sélectionnez les niveaux à inclure",
-            key=f"bubble_levels_comparison_{generate_unique_key('bubble_comp')}"
+            key="bubble_levels_comparison_fixed"  # CLÉ FIXE au lieu de dynamique
         )
     
     with col2:
@@ -1363,7 +1363,7 @@ def plot_level1_bubble_plot(df, samples_list):
         yaxis={'categoryorder': 'total ascending'}
     )
     
-    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("level_bubble_plot_comparison"))
+    st.plotly_chart(fig, use_container_width=True, key="level_bubble_plot_comparison_fixed")  # CLÉ FIXE
 
 def calculate_jaccard_similarity(df, samples_list):
     """Calcule la similarité de Jaccard entre échantillons"""
