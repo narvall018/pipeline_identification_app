@@ -474,7 +474,7 @@ def init_filter_params():
     if 'detection_radar_conf_levels' not in st.session_state:
         st.session_state.detection_radar_conf_levels = [1, 2, 3, 4, 5]
     
-    # Paramètres pour l'onglet comparison
+    # Paramètres pour l'onglet comparison - CORRECTION DES BUGS D'INTERACTION
     if 'comparison_preset_conf' not in st.session_state:
         st.session_state.comparison_preset_conf = "Niveaux 1+2+3"
     if 'comparison_manual_conf' not in st.session_state:
@@ -744,11 +744,32 @@ def load_features_data(uploaded_file):
     
     return df
 
-@st.cache_data(ttl=14400, show_spinner="Chargement de la matrice...")  # Cache optimisé
+@st.cache_data(ttl=14400, show_spinner="Chargement de la matrice...")
 def load_matrix_data(uploaded_file):
-    """Charge le fichier feature_matrix.csv."""
-    df = pd.read_csv(uploaded_file, index_col=0)
-    return df
+    """Charge le fichier feature_matrix.csv avec gestion des erreurs."""
+    try:
+        # Lire le fichier
+        df = pd.read_csv(uploaded_file)
+        
+        # Si la première colonne est vide ou s'appelle 'Unnamed: 0', la supprimer
+        if df.columns[0] in ['Unnamed: 0', ''] or df.iloc[:, 0].isnull().all():
+            df = df.drop(df.columns[0], axis=1)
+            # Réinitialiser l'index avec des noms d'échantillons
+            df.index = [f"Echantillon_{i+1}" for i in range(len(df))]
+        else:
+            # Utiliser la première colonne comme index
+            df = df.set_index(df.columns[0])
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"Erreur lors du chargement de la matrice : {str(e)}")
+        try:
+            # Essayer avec index_col=0 comme fallback
+            df = pd.read_csv(uploaded_file, index_col=0)
+            return df
+        except:
+            return None
 
 @st.cache_data(ttl=7200, show_spinner=False)  # Cache optimisé
 def calculate_detection_factor(df, samples_list, confidence_levels=None):
@@ -1299,13 +1320,14 @@ def plot_confidence_levels_distribution(df):
         return fig
     return None
 
+# CORRECTION DU BUG D'INTERACTION - Section Comparaison
 def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=None):
-    """Visualisation des niveaux de confiance à travers les échantillons avec filtres PERSISTANTS - CORRECTION ICI"""
+    """Visualisation des niveaux de confiance à travers les échantillons avec filtres PERSISTANTS CORRIGÉS"""
     if 'confidence_level' not in df.columns:
         st.warning("Colonne confidence_level non trouvée")
         return
     
-    # Filtres pour sélectionner les niveaux avec persistance
+    # Filtres pour sélectionner les niveaux avec persistance CORRIGÉE
     st.subheader("🎯 Filtres de niveaux de confiance")
     
     col1, col2 = st.columns(2)
@@ -1319,33 +1341,32 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
             "Tous les niveaux": [1, 2, 3, 4, 5]
         }
         
+        # CORRECTION : Utiliser un widget unique pour éviter les doubles clics
         preset_choice = st.selectbox(
             "Sélection rapide",
             options=list(preset_options.keys()),
             index=list(preset_options.keys()).index(st.session_state.comparison_preset_conf),
-            key="preset_confidence_levels_widget"
+            key="preset_confidence_levels_fixed"
         )
         
-        # CORRECTION : Détecter si le preset a changé et mettre à jour la sélection manuelle
+        # Mise à jour immédiate
         if preset_choice != st.session_state.comparison_preset_conf:
             st.session_state.comparison_preset_conf = preset_choice
             st.session_state.comparison_manual_conf = preset_options[preset_choice]
-            # Forcer le rerun pour mettre à jour l'interface
-            st.rerun()
         
         selected_levels_from_preset = preset_options[preset_choice]
     
     with col2:
-        # Sélection manuelle avec les niveaux du preset comme défaut
+        # Sélection manuelle CORRIGÉE
         manual_levels = st.multiselect(
             "Sélection manuelle (remplace la sélection rapide)",
             options=[1, 2, 3, 4, 5],
             default=st.session_state.comparison_manual_conf,
             help="Personnalisez votre sélection de niveaux",
-            key="manual_confidence_levels_widget"
+            key="manual_confidence_levels_fixed"
         )
         
-        # Mettre à jour session_state
+        # Mise à jour immédiate
         if manual_levels != st.session_state.comparison_manual_conf:
             st.session_state.comparison_manual_conf = manual_levels
         
@@ -1392,28 +1413,32 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
     )
     
     fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True, key="confidence_comparison_across_samples_persistent")
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("confidence_comparison_fixed"))
 
+# CORRECTION DU BUG D'INTERACTION - Bubble Plot
 def plot_level1_bubble_plot(df, samples_list):
-    """Bubble plot pour les molécules avec choix de niveaux de confiance PERSISTANT"""
+    """Bubble plot pour les molécules avec choix de niveaux de confiance CORRIGÉ et PERSISTANT"""
     if 'confidence_level' not in df.columns:
         st.warning("Colonne confidence_level non trouvée")
         return
     
-    # Sélecteur de niveaux de confiance avec persistance
+    # Sélecteur de niveaux de confiance avec persistance CORRIGÉE
     col1, col2 = st.columns([1, 3])
     with col1:
         available_levels = sorted([1, 2, 3])  # Seulement 1, 2, 3
+        
+        # CORRECTION : Widget unique pour éviter les doubles clics
         selected_levels = st.multiselect(
             "Niveaux de confiance",
             options=available_levels,
             default=st.session_state.comparison_bubble_levels,
             help="Sélectionnez les niveaux à inclure",
-            key="bubble_levels_comparison_widget"
+            key="bubble_levels_comparison_fixed"
         )
         
-        # Mettre à jour session_state
-        st.session_state.comparison_bubble_levels = selected_levels
+        # Mise à jour immédiate
+        if selected_levels != st.session_state.comparison_bubble_levels:
+            st.session_state.comparison_bubble_levels = selected_levels
     
     with col2:
         if not selected_levels:
@@ -1478,7 +1503,7 @@ def plot_level1_bubble_plot(df, samples_list):
         yaxis={'categoryorder': 'total ascending'}
     )
     
-    st.plotly_chart(fig, use_container_width=True, key="level_bubble_plot_comparison_persistent")
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("level_bubble_plot_fixed"))
 
 def calculate_jaccard_similarity(df, samples_list):
     """Calcule la similarité de Jaccard entre échantillons"""
@@ -1599,105 +1624,183 @@ def plot_hierarchical_clustering(df, samples_list, confidence_levels=None, selec
     )
     st.plotly_chart(fig_heatmap, use_container_width=True, key=generate_unique_key("jaccard_heatmap"))
 
-def safe_pca_analysis(matrix_df, n_components=3):
-    """PCA sécurisée qui gère les erreurs de dimensions"""
+# CORRECTION DU PROBLÈME D'ACP - Fonction corrigée pour la direction de l'ACP
+@st.cache_data(ttl=3600, show_spinner=False)
+def safe_pca_analysis(matrix_df, n_components=3, analysis_type="Analyse par individus"):
+    """PCA sécurisée qui gère les erreurs de dimensions et les petits datasets avec direction correcte"""
     if matrix_df is None or matrix_df.empty:
         return None, None, None
     
-    n_samples, n_features = matrix_df.shape
+    # CORRECTION PRINCIPALE : Direction de l'ACP selon le type d'analyse
+    if analysis_type == "Analyse par marqueurs":
+        # Pour l'analyse par marqueurs, on transpose la matrice
+        # Les marqueurs deviennent les "individus" à analyser
+        data_for_pca = matrix_df.T  # Transposer : marqueurs en lignes, échantillons en colonnes
+        n_samples, n_features = data_for_pca.shape
+        entity_type = "marqueurs"
+    else:
+        # Pour l'analyse par individus (défaut)
+        data_for_pca = matrix_df  # Normal : échantillons en lignes, features en colonnes
+        n_samples, n_features = data_for_pca.shape
+        entity_type = "échantillons"
+    
+    # Vérifications de base
+    if n_samples < 2:
+        st.error(f"❌ PCA impossible : seulement {n_samples} {entity_type}. Minimum 2 requis.")
+        return None, None, None
+    
+    if n_features < 2:
+        st.error(f"❌ PCA impossible : seulement {n_features} feature(s). Minimum 2 requis.")
+        return None, None, None
+    
     max_components = min(n_samples, n_features)
     
-    if max_components < 2:
-        st.error(f"Impossible de faire une PCA : seulement {max_components} composante(s) possible(s)")
-        return None, None, None
+    # Avertissement pour 2 entités
+    if n_samples == 2:
+        st.warning(f"⚠️ Avec seulement 2 {entity_type}, la PCA sera limitée à 1 composante principale.")
+        max_components = 1
     
     # Ajuster le nombre de composantes
     n_components = min(n_components, max_components)
     
-    # Standardisation
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(matrix_df.values)
-    
-    # PCA
-    pca = PCA(n_components=n_components)
-    X_pca = pca.fit_transform(X_scaled)
-    
-    return pca, X_pca, X_scaled
+    try:
+        # Standardisation
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(data_for_pca.values)
+        
+        # PCA
+        pca = PCA(n_components=n_components)
+        X_pca = pca.fit_transform(X_scaled)
+        
+        return pca, X_pca, X_scaled
+        
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la PCA : {str(e)}")
+        return None, None, None
 
 def plot_3d_pca(matrix_df, analysis_type="Analyse par individus"):
-    """PCA en 3D avec gestion d'erreur et type d'analyse"""
+    """PCA en 3D avec gestion d'erreur et type d'analyse CORRIGÉ"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
     
-    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=3)
+    # CORRECTION : Déterminer les dimensions selon le type d'analyse
+    if analysis_type == "Analyse par marqueurs":
+        n_entities = matrix_df.shape[1]  # Nombre de marqueurs (colonnes)
+        entity_type = "marqueurs"
+    else:
+        n_entities = matrix_df.shape[0]  # Nombre d'échantillons (lignes)
+        entity_type = "échantillons"
+    
+    # Vérifications préalables
+    if n_entities < 2:
+        st.error(f"❌ PCA impossible avec moins de 2 {entity_type}")
+        return
+    
+    if n_entities == 2:
+        st.warning(f"⚠️ Avec 2 {entity_type}, seule la PCA 2D est possible")
+    
+    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(3, n_entities), analysis_type=analysis_type)
     
     if pca is None:
         return
     
-    title_suffix = ""
+    # Variance expliquée
+    variance_ratio = pca.explained_variance_ratio_
+    
+    # CORRECTION : Adapter les labels selon le type d'analyse
     if analysis_type == "Analyse par marqueurs":
+        labels_for_plot = matrix_df.columns  # Noms des marqueurs
         title_suffix = " - Focus sur les marqueurs"
+    else:
+        labels_for_plot = matrix_df.index  # Noms des échantillons
+        title_suffix = ""
     
-    if X_pca.shape[1] < 3:
-        st.warning(f"PCA 3D impossible : seulement {X_pca.shape[1]} composante(s) disponible(s)")
-        # Afficher PCA 2D à la place
-        if X_pca.shape[1] >= 2:
-            fig = px.scatter(
-                x=X_pca[:, 0],
-                y=X_pca[:, 1],
-                text=matrix_df.index,
-                title=f"PCA 2D{title_suffix} (PC1: {pca.explained_variance_ratio_[0]*100:.1f}%, "
-                      f"PC2: {pca.explained_variance_ratio_[1]*100:.1f}%)",
-                labels={
-                    'x': f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)',
-                    'y': f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)'
-                },
-                color_discrete_sequence=DISTINCT_COLORS
-            )
-            fig.update_traces(textposition="top center", marker=dict(size=12))
-            fig.update_layout(height=600)
-            st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_2d_plot"))
-        return
+    # Décider du type de graphique selon le nombre de composantes
+    if X_pca.shape[1] >= 3 and n_entities >= 3:
+        # PCA 3D normale
+        fig = px.scatter_3d(
+            x=X_pca[:, 0],
+            y=X_pca[:, 1],
+            z=X_pca[:, 2],
+            text=labels_for_plot,
+            title=f"PCA 3D{title_suffix} (PC1: {variance_ratio[0]*100:.1f}%, "
+                  f"PC2: {variance_ratio[1]*100:.1f}%, "
+                  f"PC3: {variance_ratio[2]*100:.1f}%)",
+            labels={
+                'x': f'PC1 ({variance_ratio[0]*100:.1f}%)',
+                'y': f'PC2 ({variance_ratio[1]*100:.1f}%)',
+                'z': f'PC3 ({variance_ratio[2]*100:.1f}%)'
+            },
+            color_discrete_sequence=DISTINCT_COLORS
+        )
+        fig.update_traces(marker=dict(size=12))
+        fig.update_layout(height=700)
+        
+    elif X_pca.shape[1] >= 2:
+        # PCA 2D
+        fig = px.scatter(
+            x=X_pca[:, 0],
+            y=X_pca[:, 1],
+            text=labels_for_plot,
+            title=f"PCA 2D{title_suffix} (PC1: {variance_ratio[0]*100:.1f}%, "
+                  f"PC2: {variance_ratio[1]*100:.1f}%)",
+            labels={
+                'x': f'PC1 ({variance_ratio[0]*100:.1f}%)',
+                'y': f'PC2 ({variance_ratio[1]*100:.1f}%)'
+            },
+            color_discrete_sequence=DISTINCT_COLORS
+        )
+        fig.update_traces(textposition="top center", marker=dict(size=12))
+        fig.update_layout(height=600)
+        
+    else:
+        # 1D seulement
+        fig = px.scatter(
+            x=X_pca[:, 0],
+            y=[0] * len(X_pca),
+            text=labels_for_plot,
+            title=f"PCA 1D{title_suffix} (PC1: {variance_ratio[0]*100:.1f}%)",
+            labels={
+                'x': f'PC1 ({variance_ratio[0]*100:.1f}%)',
+                'y': 'Position'
+            },
+            color_discrete_sequence=DISTINCT_COLORS
+        )
+        fig.update_traces(textposition="top center", marker=dict(size=12))
+        fig.update_layout(height=400, yaxis=dict(showticklabels=False))
     
-    # PCA 3D normale
-    fig = px.scatter_3d(
-        x=X_pca[:, 0],
-        y=X_pca[:, 1],
-        z=X_pca[:, 2],
-        text=matrix_df.index,
-        title=f"PCA 3D{title_suffix} (PC1: {pca.explained_variance_ratio_[0]*100:.1f}%, "
-              f"PC2: {pca.explained_variance_ratio_[1]*100:.1f}%, "
-              f"PC3: {pca.explained_variance_ratio_[2]*100:.1f}%)",
-        labels={
-            'x': f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)',
-            'y': f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)',
-            'z': f'PC3 ({pca.explained_variance_ratio_[2]*100:.1f}%)'
-        },
-        color_discrete_sequence=DISTINCT_COLORS
-    )
-    
-    fig.update_traces(marker=dict(size=12))
-    fig.update_layout(height=700)
-    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_3d_plot"))
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_plot"))
 
 def plot_tsne_analysis(matrix_df, analysis_type="Analyse par individus"):
-    """Analyse t-SNE avec gestion d'erreur et PERSISTANCE"""
+    """Analyse t-SNE avec gestion d'erreur et PERSISTANCE CORRIGÉE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
     
-    n_samples = len(matrix_df)
+    # CORRECTION : Déterminer les dimensions selon le type d'analyse
+    if analysis_type == "Analyse par marqueurs":
+        n_entities = matrix_df.shape[1]  # Nombre de marqueurs
+        entity_type = "marqueurs"
+        data_for_tsne = matrix_df.T  # Transposer pour analyser les marqueurs
+        labels_for_plot = matrix_df.columns
+    else:
+        n_entities = matrix_df.shape[0]  # Nombre d'échantillons
+        entity_type = "échantillons"
+        data_for_tsne = matrix_df
+        labels_for_plot = matrix_df.index
     
-    if n_samples < 3:
-        st.error(f"t-SNE impossible : seulement {n_samples} échantillon(s). Minimum 3 requis.")
+    # Vérifications strictes pour t-SNE
+    if n_entities < 3:
+        st.error(f"❌ t-SNE impossible : seulement {n_entities} {entity_type}. **Minimum 3 requis** pour t-SNE.")
+        st.info(f"💡 Suggestion : Utilisez la PCA pour analyser vos données avec moins de 3 {entity_type}.")
         return
     
-    # Ajuster la perplexité selon le nombre d'échantillons
-    max_perplexity = min(30, (n_samples - 1) // 3)
+    # Ajuster la perplexité selon le nombre d'entités
+    max_perplexity = min(30, (n_entities - 1) // 3)
     
-    if max_perplexity < 5:
-        max_perplexity = min(5, n_samples - 1)
+    if max_perplexity < 1:
+        max_perplexity = 1
     
     # Paramètres t-SNE avec persistance
     perplexity = st.slider(
@@ -1705,7 +1808,7 @@ def plot_tsne_analysis(matrix_df, analysis_type="Analyse par individus"):
         1, 
         max_perplexity, 
         min(max_perplexity, st.session_state.stats_tsne_perplexity),
-        help=f"Maximum possible: {max_perplexity} (basé sur {n_samples} échantillons)",
+        help=f"Maximum possible: {max_perplexity} (basé sur {n_entities} {entity_type})",
         key="tsne_perplexity_widget"
     )
     
@@ -1714,7 +1817,7 @@ def plot_tsne_analysis(matrix_df, analysis_type="Analyse par individus"):
     
     # Standardisation
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(matrix_df.values)
+    X_scaled = scaler.fit_transform(data_for_tsne.values)
     
     try:
         # t-SNE
@@ -1728,7 +1831,7 @@ def plot_tsne_analysis(matrix_df, analysis_type="Analyse par individus"):
         fig = px.scatter(
             x=X_tsne[:, 0],
             y=X_tsne[:, 1],
-            text=matrix_df.index,
+            text=labels_for_plot,
             title=f"Analyse t-SNE{title_suffix} (perplexité={perplexity})",
             labels={'x': 't-SNE 1', 'y': 't-SNE 2'},
             color_discrete_sequence=DISTINCT_COLORS
@@ -1739,15 +1842,22 @@ def plot_tsne_analysis(matrix_df, analysis_type="Analyse par individus"):
         st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("tsne_plot"))
         
     except Exception as e:
-        st.error(f"Erreur t-SNE : {str(e)}")
+        st.error(f"❌ Erreur t-SNE : {str(e)}")
+        st.info("💡 Essayez de réduire la perplexité ou d'utiliser la PCA à la place.")
 
 def perform_pca_analysis(matrix_df, analysis_type="Analyse par individus"):
-    """Effectue une analyse PCA sécurisée sur la matrice des features"""
+    """Effectue une analyse PCA sécurisée sur la matrice des features CORRIGÉE"""
     if matrix_df is None or matrix_df.empty:
         st.error("Aucune matrice de features chargée")
         return
     
-    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], matrix_df.shape[0]))
+    # CORRECTION : Adapter selon le type d'analyse
+    if analysis_type == "Analyse par marqueurs":
+        max_components = min(10, matrix_df.shape[1], matrix_df.shape[0])  # Marqueurs
+    else:
+        max_components = min(10, matrix_df.shape[1], matrix_df.shape[0])  # Échantillons
+    
+    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=max_components, analysis_type=analysis_type)
     
     if pca is None:
         return
@@ -1787,18 +1897,76 @@ def perform_pca_analysis(matrix_df, analysis_type="Analyse par individus"):
         st.plotly_chart(fig1, use_container_width=True, key=generate_unique_key("pca_variance_plot"))
     
     with col2:
-        # Score plot PCA
+        # Score plot PCA CORRIGÉ
         if X_pca.shape[1] >= 2:
+            # CORRECTION : Adapter les labels selon le type d'analyse
+            if analysis_type == "Analyse par marqueurs":
+                labels_for_plot = matrix_df.columns  # Noms des marqueurs
+            else:
+                labels_for_plot = matrix_df.index  # Noms des échantillons
+            
             fig2 = px.scatter(
                 x=X_pca[:, 0],
                 y=X_pca[:, 1],
-                text=matrix_df.index,
+                text=labels_for_plot,
                 title=f"Score plot PCA{title_suffix} (PC1: {variance_ratio[0]*100:.1f}%, PC2: {variance_ratio[1]*100:.1f}%)",
                 labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': f'PC2 ({variance_ratio[1]*100:.1f}%)'},
                 color_discrete_sequence=DISTINCT_COLORS
             )
             fig2.update_traces(textposition="top center")
             st.plotly_chart(fig2, use_container_width=True, key=generate_unique_key("pca_score_plot"))
+    
+    # AJOUT CORRECTION : Afficher les loadings pour l'analyse par individus
+    if analysis_type == "Analyse par individus":
+        # Afficher les top contributeurs (descripteurs/features) pour l'analyse par individus
+        st.subheader("🏆 Top contributeurs des descripteurs/features")
+        
+        # Calculer les loadings (contribution des features aux composantes principales)
+        n_components_loadings = min(3, pca.n_components_)
+        loadings_df = pd.DataFrame(
+            pca.components_[:n_components_loadings].T,
+            columns=[f'PC{i+1}' for i in range(n_components_loadings)],
+            index=matrix_df.columns  # Noms des features/descripteurs
+        )
+        
+        if n_components_loadings >= 2:
+            # Calculer la distance à l'origine pour PC1 et PC2
+            loadings_df['Distance'] = np.sqrt(loadings_df['PC1']**2 + loadings_df['PC2']**2)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write(f"**Top 15 contributeurs à PC1:**")
+                top_pc1 = loadings_df.reindex(loadings_df['PC1'].abs().sort_values(ascending=False).index).head(15)
+                st.dataframe(
+                    top_pc1[['PC1', 'Distance']].round(4),
+                    use_container_width=True
+                )
+            
+            with col2:
+                st.write(f"**Top 15 contributeurs à PC2:**")
+                top_pc2 = loadings_df.reindex(loadings_df['PC2'].abs().sort_values(ascending=False).index).head(15)
+                st.dataframe(
+                    top_pc2[['PC2', 'Distance']].round(4),
+                    use_container_width=True
+                )
+            
+            # Top contributeurs globaux (distance maximale à l'origine)
+            st.subheader("🎯 Top descripteurs les plus discriminants (distance maximale)")
+            
+            top_discriminants = loadings_df.nlargest(20, 'Distance')
+            st.dataframe(
+                top_discriminants[['PC1', 'PC2', 'Distance']].round(4),
+                use_container_width=True
+            )
+        else:
+            # Pour 1 composante seulement
+            st.subheader("🏆 Top contributeurs à PC1")
+            top_pc1 = loadings_df.reindex(loadings_df['PC1'].abs().sort_values(ascending=False).index).head(20)
+            st.dataframe(
+                top_pc1[['PC1']].round(4),
+                use_container_width=True
+            )
     
     # Affichage des métriques
     st.subheader("Métriques PCA")
@@ -1809,56 +1977,80 @@ def perform_pca_analysis(matrix_df, analysis_type="Analyse par individus"):
             with col:
                 st.metric(f"PC{i+1} variance expliquée", f"{variance_ratio[i]*100:.1f}%")
 
-# NOUVELLES FONCTIONS POUR LES ANALYSES STATISTIQUES AVANCÉES
-
 def plot_correlation_heatmap(matrix_df, analysis_type="Analyse par individus"):
-    """Heatmap de corrélation entre échantillons ou marqueurs"""
+    """Heatmap de corrélation entre échantillons ou marqueurs CORRIGÉE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
     
+    # CORRECTION : Adapter selon le type d'analyse
     if analysis_type == "Analyse par marqueurs":
-        # Transposer pour analyser les corrélations entre marqueurs (features)
+        # Pour les marqueurs, analyser les corrélations entre marqueurs (features)
+        if matrix_df.shape[1] < 2:
+            st.error("❌ Corrélation entre marqueurs impossible : moins de 2 features")
+            return None
         corr_matrix = matrix_df.corr()
         title = "Matrice de corrélation entre marqueurs (features)"
+        n_entities = matrix_df.shape[1]
     else:
         # Calculer la matrice de corrélation entre échantillons
+        n_entities = matrix_df.shape[0]
+        if n_entities < 2:
+            st.error("❌ Analyse de corrélation impossible avec moins de 2 échantillons")
+            return None
+        if n_entities == 2:
+            st.info("📊 Avec 2 échantillons, la corrélation sera limitée")
         corr_matrix = matrix_df.T.corr()
         title = "Matrice de corrélation entre échantillons"
     
-    fig = px.imshow(
-        corr_matrix,
-        text_auto=".2f",
-        aspect="auto",
-        title=title,
-        color_continuous_scale='RdBu_r',
-        range_color=[-1, 1]
-    )
-    
-    fig.update_layout(height=600)
-    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("correlation_heatmap"))
-    
-    return corr_matrix
+    try:
+        fig = px.imshow(
+            corr_matrix,
+            text_auto=".2f",
+            aspect="auto",
+            title=title,
+            color_continuous_scale='RdBu_r',
+            range_color=[-1, 1]
+        )
+        
+        fig.update_layout(height=600)
+        st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("correlation_heatmap"))
+        
+        return corr_matrix
+        
+    except Exception as e:
+        st.error(f"❌ Erreur lors du calcul de corrélation : {str(e)}")
+        return None
 
 def perform_kmeans_clustering(matrix_df, analysis_type="Analyse par individus"):
-    """Clustering K-means sur la matrice des features avec validation du nombre de clusters et PERSISTANCE"""
+    """Clustering K-means sur la matrice des features avec validation du nombre de clusters et PERSISTANCE CORRIGÉE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
     
-    # CORRECTION : Vérifier le nombre d'échantillons
-    n_samples = len(matrix_df)
-    max_clusters = min(10, n_samples)
+    # CORRECTION : Adapter selon le type d'analyse
+    if analysis_type == "Analyse par marqueurs":
+        n_entities = matrix_df.shape[1]  # Nombre de marqueurs
+        entity_type = "marqueurs"
+        data_for_clustering = matrix_df.T  # Transposer pour analyser les marqueurs
+        labels_for_plot = matrix_df.columns
+    else:
+        n_entities = matrix_df.shape[0]  # Nombre d'échantillons
+        entity_type = "échantillons"
+        data_for_clustering = matrix_df
+        labels_for_plot = matrix_df.index
     
-    if n_samples < 2:
-        st.error(f"Impossible de faire du clustering : seulement {n_samples} échantillon(s). Minimum 2 requis.")
+    # Vérifications strictes
+    if n_entities < 2:
+        st.error(f"❌ Impossible de faire du clustering : seulement {n_entities} {entity_type}. **Minimum 2 requis**.")
         return
     
-    # CORRECTION ICI: Gérer le cas où n_samples = 2
-    if n_samples == 2:
-        # Si seulement 2 échantillons, on ne peut avoir que 2 clusters
+    max_clusters = min(10, n_entities)
+    
+    # Cas spécial pour 2 entités
+    if n_entities == 2:
         n_clusters = 2
-        st.info(f"Avec seulement {n_samples} échantillons, le nombre de clusters est fixé à {n_clusters}.")
+        st.info(f"📊 Avec seulement {n_entities} {entity_type}, le nombre de clusters est fixé à {n_clusters}.")
     else:
         # Sélection du nombre de clusters avec validation et persistance
         n_clusters = st.slider(
@@ -1866,7 +2058,7 @@ def perform_kmeans_clustering(matrix_df, analysis_type="Analyse par individus"):
             2, 
             max_clusters, 
             min(st.session_state.stats_kmeans_clusters, max_clusters), 
-            help=f"Maximum possible: {max_clusters} (basé sur {n_samples} échantillons)",
+            help=f"Maximum possible: {max_clusters} (basé sur {n_entities} {entity_type})",
             key="kmeans_clusters_widget"
         )
         
@@ -1874,56 +2066,74 @@ def perform_kmeans_clustering(matrix_df, analysis_type="Analyse par individus"):
         st.session_state.stats_kmeans_clusters = n_clusters
     
     # Vérification de sécurité
-    if n_clusters > n_samples:
-        st.error(f"Le nombre de clusters ({n_clusters}) ne peut pas être supérieur au nombre d'échantillons ({n_samples})")
+    if n_clusters > n_entities:
+        st.error(f"❌ Le nombre de clusters ({n_clusters}) ne peut pas être supérieur au nombre de {entity_type} ({n_entities})")
         return
     
     # Standardisation
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(matrix_df.values)
+    X_scaled = scaler.fit_transform(data_for_clustering.values)
     
     try:
         # K-means
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         cluster_labels = kmeans.fit_predict(X_scaled)
         
-        # PCA pour visualisation
-        pca = PCA(n_components=2)
-        X_pca = pca.fit_transform(X_scaled)
+        # PCA pour visualisation (avec gestion des petits datasets)
+        pca_vis, X_pca_vis, _ = safe_pca_analysis(matrix_df, n_components=2, analysis_type=analysis_type)
+        
+        if pca_vis is None:
+            st.error("❌ Impossible de visualiser le clustering sans PCA")
+            return
         
         title_suffix = ""
         if analysis_type == "Analyse par marqueurs":
             title_suffix = " - Focus sur les marqueurs"
         
-        # Graphique
-        fig = px.scatter(
-            x=X_pca[:, 0],
-            y=X_pca[:, 1],
-            color=cluster_labels,
-            text=matrix_df.index,
-            title=f"Clustering K-means{title_suffix} (k={n_clusters})",
-            labels={'x': f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)', 
-                    'y': f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)'},
-            color_discrete_sequence=DISTINCT_COLORS
-        )
+        # Graphique adapté selon le nombre de composantes PCA disponibles
+        if X_pca_vis.shape[1] >= 2:
+            # Visualisation 2D normale
+            fig = px.scatter(
+                x=X_pca_vis[:, 0],
+                y=X_pca_vis[:, 1],
+                color=cluster_labels,
+                text=labels_for_plot,
+                title=f"Clustering K-means{title_suffix} (k={n_clusters})",
+                labels={'x': f'PC1 ({pca_vis.explained_variance_ratio_[0]*100:.1f}%)', 
+                        'y': f'PC2 ({pca_vis.explained_variance_ratio_[1]*100:.1f}%)'},
+                color_discrete_sequence=DISTINCT_COLORS
+            )
+            fig.update_traces(textposition="top center", marker=dict(size=12))
+            fig.update_layout(height=600)
+        else:
+            # Visualisation 1D
+            fig = px.scatter(
+                x=X_pca_vis[:, 0],
+                y=[0] * len(X_pca_vis),
+                color=cluster_labels,
+                text=labels_for_plot,
+                title=f"Clustering K-means{title_suffix} (k={n_clusters}) - Vue 1D",
+                labels={'x': f'PC1 ({pca_vis.explained_variance_ratio_[0]*100:.1f}%)', 'y': 'Position'},
+                color_discrete_sequence=DISTINCT_COLORS
+            )
+            fig.update_traces(textposition="top center", marker=dict(size=12))
+            fig.update_layout(height=400, yaxis=dict(showticklabels=False))
         
-        fig.update_traces(textposition="top center", marker=dict(size=12))
-        fig.update_layout(height=600)
         st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("kmeans_plot"))
         
         # Afficher les clusters
-        st.subheader("Composition des clusters")
+        st.subheader(f"📋 Composition des clusters")
         cluster_df = pd.DataFrame({
-            'Échantillon': matrix_df.index,
+            f'{entity_type.capitalize()}': labels_for_plot,
             'Cluster': cluster_labels
         })
         
         for i in range(n_clusters):
-            cluster_samples = cluster_df[cluster_df['Cluster'] == i]['Échantillon'].tolist()
-            st.write(f"**Cluster {i}:** {', '.join(cluster_samples)}")
+            cluster_entities = cluster_df[cluster_df['Cluster'] == i][f'{entity_type.capitalize()}'].tolist()
+            st.write(f"**Cluster {i}:** {', '.join(cluster_entities)}")
     
     except Exception as e:
-        st.error(f"Erreur lors du clustering K-means : {str(e)}")
+        st.error(f"❌ Erreur lors du clustering K-means : {str(e)}")
 
 def plot_boxplot_by_category(df, samples_list):
     """Boxplots des intensités par catégorie"""
@@ -2144,6 +2354,16 @@ def plot_volcano_plot(matrix_df):
         st.warning("Aucune matrice chargée")
         return
     
+    n_samples = len(matrix_df)
+    
+    # Vérifications
+    if n_samples < 2:
+        st.error("❌ Volcano Plot impossible avec moins de 2 échantillons")
+        return None
+    
+    if n_samples == 2:
+        st.info("📊 Avec seulement 2 échantillons, l'un ira dans le groupe 1, l'autre dans le groupe 2")
+    
     samples_list = list(matrix_df.index)
     
     # Interface pour sélectionner les groupes
@@ -2151,10 +2371,11 @@ def plot_volcano_plot(matrix_df):
     
     with col1:
         st.subheader("Groupe 1")
+        max_group1 = max(1, n_samples // 2) if n_samples > 2 else 1
         group1_samples = st.multiselect(
             "Sélectionner les échantillons du groupe 1",
             options=samples_list,
-            default=st.session_state.volcano_group1,
+            default=st.session_state.volcano_group1 if st.session_state.volcano_group1 else samples_list[:max_group1],
             key="volcano_group1_widget"
         )
         st.session_state.volcano_group1 = group1_samples
@@ -2169,7 +2390,7 @@ def plot_volcano_plot(matrix_df):
         group2_samples = st.multiselect(
             "Sélectionner les échantillons du groupe 2",
             options=available_group2,
-            default=[s for s in st.session_state.volcano_group2 if s in available_group2],
+            default=[s for s in st.session_state.volcano_group2 if s in available_group2] if st.session_state.volcano_group2 else available_group2,
             key="volcano_group2_widget"
         )
         st.session_state.volcano_group2 = group2_samples
@@ -2177,9 +2398,13 @@ def plot_volcano_plot(matrix_df):
         if group2_samples:
             st.info(f"Groupe 2: {len(group2_samples)} échantillons")
     
+    # Vérifications des groupes
     if not group1_samples or not group2_samples:
-        st.warning("Veuillez sélectionner des échantillons pour les deux groupes")
-        return
+        st.warning("⚠️ Veuillez sélectionner au moins un échantillon pour chaque groupe")
+        return None
+    
+    if len(group1_samples) == 1 and len(group2_samples) == 1:
+        st.warning("⚠️ Avec 1 échantillon par groupe, les tests statistiques seront limités")
     
     # Paramètres de seuillage
     col1, col2 = st.columns(2)
@@ -2213,8 +2438,8 @@ def plot_volcano_plot(matrix_df):
         volcano_data = prepare_volcano_data(matrix_df, group1_samples, group2_samples)
     
     if volcano_data is None or volcano_data.empty:
-        st.error("Erreur dans le calcul des données volcano")
-        return
+        st.error("❌ Erreur dans le calcul des données volcano")
+        return None
     
     # Classifier les points
     volcano_data['Significance'] = 'Non significatif'
@@ -2280,7 +2505,7 @@ def plot_volcano_plot(matrix_df):
         st.metric("% significatifs", f"{(n_up + n_down)/n_total*100:.1f}%")
     
     # Tableau des marqueurs significatifs
-    st.subheader("Marqueurs significatifs")
+    st.subheader("📋 Marqueurs significatifs")
     
     significant_markers = volcano_data[
         volcano_data['Significance'] != 'Non significatif'
@@ -2303,19 +2528,306 @@ def plot_volcano_plot(matrix_df):
             mime="text/csv"
         )
     else:
-        st.info("Aucun marqueur significatif trouvé avec les seuils actuels")
+        st.info("ℹ️ Aucun marqueur significatif trouvé avec les seuils actuels")
+    
+    return significant_markers if not significant_markers.empty else None
 
-def plot_markers_pca(matrix_df, significant_markers_df=None):
-    """PCA focalisée sur les marqueurs significatifs"""
-    st.subheader("🎯 PCA des marqueurs significatifs")
+# CORRECTION DU BUG KeyError PC2 - Fonction corrigée
+def plot_complete_pca_with_loadings(matrix_df, analysis_type="Analyse par individus"):
+    """PCA complète avec projection de TOUS les marqueurs et analyse détaillée CORRIGÉE"""
+    st.subheader("🎯 PCA complète avec projection de tous les marqueurs")
+    
+    if matrix_df is None or matrix_df.empty:
+        st.warning("Aucune matrice chargée")
+        return
+    
+    # CORRECTION : Déterminer les dimensions selon le type d'analyse
+    if analysis_type == "Analyse par marqueurs":
+        n_entities = matrix_df.shape[1]  # Nombre de marqueurs
+        entity_type = "marqueurs"
+    else:
+        n_entities = matrix_df.shape[0]  # Nombre d'échantillons
+        entity_type = "échantillons"
+    
+    # Vérifications préalables
+    if n_entities < 2:
+        st.error(f"❌ PCA impossible avec moins de 2 {entity_type}")
+        return
+    
+    if n_entities == 2:
+        st.warning(f"⚠️ Avec seulement 2 {entity_type}, l'analyse PCA sera limitée à 1 composante principale.")
+    
+    # Effectuer la PCA sur la matrice complète AVEC LA DIRECTION CORRECTE
+    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], n_entities), analysis_type=analysis_type)
+    
+    if pca is None:
+        return
+    
+    # Variance expliquée
+    variance_ratio = pca.explained_variance_ratio_
+    
+    # CORRECTION PRINCIPALE : Calculer les loadings selon le type d'analyse
+    n_components = min(10, pca.n_components_)
+    
+    if analysis_type == "Analyse par marqueurs":
+        # Pour l'analyse par marqueurs, les loadings sont les composantes principales 
+        # appliquées sur les échantillons (car on a transposé)
+        loadings_df = pd.DataFrame(
+            pca.components_[:n_components].T,
+            columns=[f'PC{i+1}' for i in range(n_components)],
+            index=matrix_df.index  # Noms des échantillons
+        )
+        labels_for_samples = matrix_df.columns  # Marqueurs pour le score plot
+        labels_for_loadings = matrix_df.index   # Échantillons pour les loadings
+    else:
+        # Pour l'analyse par individus (échantillons)
+        loadings_df = pd.DataFrame(
+            pca.components_[:n_components].T,
+            columns=[f'PC{i+1}' for i in range(n_components)],
+            index=matrix_df.columns  # Noms des features/marqueurs
+        )
+        labels_for_samples = matrix_df.index    # Échantillons pour le score plot
+        labels_for_loadings = matrix_df.columns # Features pour les loadings
+    
+    # Interface pour sélectionner les composantes à visualiser (seulement si plus d'1 composante)
+    if n_components > 1:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            pc_x = st.selectbox(
+                "Composante X",
+                options=[f'PC{i+1}' for i in range(n_components)],
+                index=0,
+                key="pc_x_selector"
+            )
+        
+        with col2:
+            pc_y = st.selectbox(
+                "Composante Y",
+                options=[f'PC{i+1}' for i in range(n_components)],
+                index=1 if n_components > 1 else 0,
+                key="pc_y_selector"
+            )
+        
+        pc_x_idx = int(pc_x.replace('PC', '')) - 1
+        pc_y_idx = int(pc_y.replace('PC', '')) - 1
+        
+        # Affichage côte à côte : échantillons et marqueurs
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Score plot PCA
+            if analysis_type == "Analyse par marqueurs":
+                title_samples = f"PCA - Projection des marqueurs ({pc_x}: {variance_ratio[pc_x_idx]*100:.1f}%, {pc_y}: {variance_ratio[pc_y_idx]*100:.1f}%)"
+            else:
+                title_samples = f"PCA - Projection des échantillons ({pc_x}: {variance_ratio[pc_x_idx]*100:.1f}%, {pc_y}: {variance_ratio[pc_y_idx]*100:.1f}%)"
+            
+            fig_samples = px.scatter(
+                x=X_pca[:, pc_x_idx],
+                y=X_pca[:, pc_y_idx],
+                text=labels_for_samples,
+                title=title_samples,
+                labels={'x': f'{pc_x} ({variance_ratio[pc_x_idx]*100:.1f}%)', 'y': f'{pc_y} ({variance_ratio[pc_y_idx]*100:.1f}%)'},
+                color_discrete_sequence=DISTINCT_COLORS
+            )
+            fig_samples.update_traces(textposition="top center", marker=dict(size=12))
+            fig_samples.update_layout(height=500)
+            st.plotly_chart(fig_samples, use_container_width=True, key=generate_unique_key("pca_samples_complete"))
+        
+        with col2:
+            # CORRECTION : Vérifier que PC2 existe avant de l'utiliser
+            if pc_y in loadings_df.columns:
+                # Projection des loadings
+                if analysis_type == "Analyse par marqueurs":
+                    title_loadings = f"PCA - Contribution des échantillons aux marqueurs (Loadings)"
+                else:
+                    title_loadings = f"PCA - Projection de TOUS les marqueurs (Loadings)"
+                
+                fig_loadings = px.scatter(
+                    loadings_df,
+                    x=pc_x,
+                    y=pc_y,
+                    title=title_loadings,
+                    labels={'x': f'{pc_x} ({variance_ratio[pc_x_idx]*100:.1f}%)', 'y': f'{pc_y} ({variance_ratio[pc_y_idx]*100:.1f}%)'},
+                    hover_name=labels_for_loadings,
+                    opacity=0.6
+                )
+                
+                # CORRECTION : Calculer la distance seulement si PC2 existe
+                loadings_df['Distance'] = np.sqrt(loadings_df[pc_x]**2 + loadings_df[pc_y]**2)
+                
+                # Ajouter des cercles de contribution
+                theta = np.linspace(0, 2*np.pi, 100)
+                for radius in [0.3, 0.6, 0.9]:
+                    x_circle = radius * np.cos(theta)
+                    y_circle = radius * np.sin(theta)
+                    fig_loadings.add_trace(go.Scatter(
+                        x=x_circle, y=y_circle,
+                        mode='lines',
+                        line=dict(dash='dash', color='gray', width=1),
+                        showlegend=False,
+                        hoverinfo='skip',
+                        name=f'Contribution {radius:.1f}'
+                    ))
+                
+                # Mettre en évidence les top contributeurs
+                top_contributors = loadings_df.nlargest(20, 'Distance')
+                
+                fig_loadings.add_trace(go.Scatter(
+                    x=top_contributors[pc_x],
+                    y=top_contributors[pc_y],
+                    mode='markers+text',
+                    marker=dict(size=8, color='red'),
+                    text=top_contributors.index,
+                    textposition="top center",
+                    name="Top 20 contributeurs",
+                    showlegend=True
+                ))
+                
+                fig_loadings.update_layout(
+                    height=500,
+                    xaxis=dict(range=[-1.1, 1.1]),
+                    yaxis=dict(range=[-1.1, 1.1])
+                )
+                
+                st.plotly_chart(fig_loadings, use_container_width=True, key=generate_unique_key("pca_loadings_complete"))
+            else:
+                st.warning(f"⚠️ {pc_y} n'est pas disponible. Affichage en 1D uniquement.")
+    
+    else:
+        # Cas spécial : 1 seule composante
+        st.info(f"📊 Avec 2 {entity_type}, seule 1 composante principale est disponible.")
+        
+        if analysis_type == "Analyse par marqueurs":
+            title_1d = f"PCA 1D - Projection des marqueurs (PC1: {variance_ratio[0]*100:.1f}%)"
+        else:
+            title_1d = f"PCA 1D - Projection des échantillons (PC1: {variance_ratio[0]*100:.1f}%)"
+        
+        fig_samples = px.scatter(
+            x=X_pca[:, 0],
+            y=[0] * len(X_pca),
+            text=labels_for_samples,
+            title=title_1d,
+            labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': 'Position'},
+            color_discrete_sequence=DISTINCT_COLORS
+        )
+        fig_samples.update_traces(textposition="top center", marker=dict(size=12))
+        fig_samples.update_layout(height=400, yaxis=dict(showticklabels=False))
+        st.plotly_chart(fig_samples, use_container_width=True, key=generate_unique_key("pca_samples_1d"))
+        
+        # Loadings 1D
+        if analysis_type == "Analyse par marqueurs":
+            title_loadings_1d = "Contribution des échantillons (PC1)"
+        else:
+            title_loadings_1d = "Contribution des marqueurs (PC1)"
+        
+        fig_loadings = px.scatter(
+            x=loadings_df['PC1'],
+            y=[0] * len(loadings_df),
+            hover_name=labels_for_loadings,
+            title=title_loadings_1d,
+            labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': 'Position'}
+        )
+        fig_loadings.update_layout(height=400, yaxis=dict(showticklabels=False))
+        st.plotly_chart(fig_loadings, use_container_width=True, key=generate_unique_key("pca_loadings_1d"))
+    
+    # Variance expliquée par toutes les composantes
+    st.subheader("📊 Variance expliquée par les composantes principales")
+    
+    fig_variance = go.Figure()
+    fig_variance.add_trace(go.Bar(
+        x=[f'PC{i+1}' for i in range(len(variance_ratio))],
+        y=variance_ratio * 100,
+        name='Variance individuelle',
+        marker_color=DISTINCT_COLORS[0]
+    ))
+    
+    cumsum_variance = np.cumsum(variance_ratio)
+    fig_variance.add_trace(go.Scatter(
+        x=[f'PC{i+1}' for i in range(len(cumsum_variance))],
+        y=cumsum_variance * 100,
+        mode='lines+markers',
+        name='Variance cumulée',
+        line=dict(color=DISTINCT_COLORS[1], width=3),
+        yaxis='y2'
+    ))
+    
+    fig_variance.update_layout(
+        title="Variance expliquée par toutes les composantes principales",
+        xaxis_title="Composante principale",
+        yaxis_title="Variance expliquée (%)",
+        yaxis2=dict(
+            title="Variance cumulée (%)",
+            overlaying='y',
+            side='right'
+        ),
+        height=400
+    )
+    
+    st.plotly_chart(fig_variance, use_container_width=True, key=generate_unique_key("pca_variance_complete"))
+    
+    # Tableau des top contributeurs (seulement si plus d'1 composante)
+    if n_components > 1 and 'Distance' in loadings_df.columns:
+        st.subheader(f"🏆 Top contributeurs pour {pc_x} et {pc_y}")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write(f"**Top 15 contributeurs à {pc_x}:**")
+            top_pc_x = loadings_df.reindex(loadings_df[pc_x].abs().sort_values(ascending=False).index).head(15)
+            st.dataframe(
+                top_pc_x[[pc_x, 'Distance']].round(4),
+                use_container_width=True
+            )
+        
+        with col2:
+            st.write(f"**Top 15 contributeurs à {pc_y}:**")
+            top_pc_y = loadings_df.reindex(loadings_df[pc_y].abs().sort_values(ascending=False).index).head(15)
+            st.dataframe(
+                top_pc_y[[pc_y, 'Distance']].round(4),
+                use_container_width=True
+            )
+        
+        # Top contributeurs globaux (distance maximale à l'origine)
+        st.subheader("🎯 Top marqueurs les plus discriminants (distance maximale)")
+        
+        top_discriminants = loadings_df.nlargest(20, 'Distance')
+        st.dataframe(
+            top_discriminants[[pc_x, pc_y, 'Distance']].round(4),
+            use_container_width=True
+        )
+    else:
+        st.subheader("🏆 Top contributeurs à PC1")
+        top_pc1 = loadings_df.reindex(loadings_df['PC1'].abs().sort_values(ascending=False).index).head(20)
+        st.dataframe(
+            top_pc1[['PC1']].round(4),
+            use_container_width=True
+        )
+    
+    # Export des loadings
+    if st.button("📥 Exporter les loadings complets"):
+        csv_loadings = loadings_df.to_csv()
+        st.download_button(
+            label="📥 Télécharger les loadings PCA",
+            data=csv_loadings,
+            file_name=f"pca_loadings_complets_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+
+# CORRECTION DU BUG KeyError PC2 - Fonction corrigée
+def plot_markers_pca_with_projections(matrix_df, significant_markers_df=None):
+    """PCA focalisée sur les marqueurs significatifs avec projection de tous les marqueurs - VERSION CORRIGÉE"""
+    st.subheader("🎯 PCA des marqueurs significatifs avec projection complète")
     
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
     
     if significant_markers_df is None or significant_markers_df.empty:
-        st.info("Aucun marqueur significatif sélectionné. Utilisation de tous les features.")
-        selected_features = matrix_df.columns.tolist()
+        st.info("Aucun marqueur significatif sélectionné. Analyse de tous les features avec variance élevée.")
+        # Utiliser les features avec la plus grande variance
+        feature_var = matrix_df.var(axis=0).nlargest(100)
+        selected_features = feature_var.index.tolist()
     else:
         selected_features = significant_markers_df['Feature'].tolist()
         selected_features = [f for f in selected_features if f in matrix_df.columns]
@@ -2324,13 +2836,205 @@ def plot_markers_pca(matrix_df, significant_markers_df=None):
         st.warning("Aucun marqueur valide trouvé")
         return
     
-    # Filtrer la matrice sur les marqueurs sélectionnés
-    markers_matrix = matrix_df[selected_features]
+    # Effectuer la PCA sur la matrice complète (tous les features) - INDIVIDUS
+    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], matrix_df.shape[0]), analysis_type="Analyse par individus")
     
-    st.info(f"Analyse PCA sur {len(selected_features)} marqueurs")
+    if pca is None:
+        return
     
-    # Effectuer l'analyse PCA
-    perform_pca_analysis(markers_matrix, "Analyse par marqueurs")
+    # Variance expliquée
+    variance_ratio = pca.explained_variance_ratio_
+    
+    # CORRECTION : Vérifier le nombre de composantes disponibles
+    n_components = min(5, pca.n_components_)
+    
+    # Calculer les loadings pour TOUS les features
+    loadings_df = pd.DataFrame(
+        pca.components_[:n_components].T,
+        columns=[f'PC{i+1}' for i in range(n_components)],
+        index=matrix_df.columns
+    )
+    
+    # Marquer les features significatifs
+    loadings_df['Significatif'] = loadings_df.index.isin(selected_features)
+    
+    # CORRECTION : Calculer la distance seulement si PC2 existe
+    if n_components >= 2:
+        loadings_df['Distance'] = np.sqrt(loadings_df['PC1']**2 + loadings_df['PC2']**2)
+    else:
+        loadings_df['Distance'] = np.abs(loadings_df['PC1'])
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Score plot PCA avec échantillons
+        if X_pca.shape[1] >= 2:
+            fig_samples = px.scatter(
+                x=X_pca[:, 0],
+                y=X_pca[:, 1],
+                text=matrix_df.index,
+                title=f"PCA - Projection des échantillons (PC1: {variance_ratio[0]*100:.1f}%, PC2: {variance_ratio[1]*100:.1f}%)",
+                labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': f'PC2 ({variance_ratio[1]*100:.1f}%)'},
+                color_discrete_sequence=DISTINCT_COLORS
+            )
+            fig_samples.update_traces(textposition="top center", marker=dict(size=12))
+            fig_samples.update_layout(height=500)
+            st.plotly_chart(fig_samples, use_container_width=True, key=generate_unique_key("pca_samples_markers"))
+    
+    with col2:
+        # Projection des marqueurs avec distinction significatifs/non-significatifs
+        if pca.components_.shape[0] >= 2 and n_components >= 2:
+            # Créer le graphique des loadings avec TOUS les marqueurs
+            fig_loadings = go.Figure()
+            
+            # Marqueurs non significatifs (gris clair)
+            non_significant = loadings_df[~loadings_df['Significatif']]
+            if not non_significant.empty:
+                fig_loadings.add_trace(go.Scatter(
+                    x=non_significant['PC1'],
+                    y=non_significant['PC2'],
+                    mode='markers',
+                    marker=dict(size=4, color='lightgray', opacity=0.5),
+                    name='Autres marqueurs',
+                    hovertemplate='Feature: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>',
+                    text=non_significant.index
+                ))
+            
+            # Marqueurs significatifs (colorés)
+            significant = loadings_df[loadings_df['Significatif']]
+            if not significant.empty:
+                fig_loadings.add_trace(go.Scatter(
+                    x=significant['PC1'],
+                    y=significant['PC2'],
+                    mode='markers',
+                    marker=dict(size=8, color='#FF6B6B', opacity=0.8),
+                    name='Marqueurs significatifs',
+                    hovertemplate='Feature: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>',
+                    text=significant.index
+                ))
+            
+            # Ajouter des cercles de contribution
+            theta = np.linspace(0, 2*np.pi, 100)
+            for radius, label in zip([0.5, 0.8], ['Contribution modérée', 'Forte contribution']):
+                x_circle = radius * np.cos(theta)
+                y_circle = radius * np.sin(theta)
+                fig_loadings.add_trace(go.Scatter(
+                    x=x_circle, y=y_circle,
+                    mode='lines',
+                    line=dict(dash='dash', color='gray', width=1),
+                    showlegend=False,
+                    hoverinfo='skip',
+                    name=label
+                ))
+            
+            fig_loadings.update_layout(
+                title=f"Projection de TOUS les marqueurs (Loadings)<br><sub>{len(significant)} significatifs sur {len(loadings_df)} total</sub>",
+                xaxis_title=f'PC1 ({variance_ratio[0]*100:.1f}%)',
+                yaxis_title=f'PC2 ({variance_ratio[1]*100:.1f}%)',
+                xaxis=dict(range=[-1.1, 1.1]),
+                yaxis=dict(range=[-1.1, 1.1]),
+                height=500
+            )
+            
+            st.plotly_chart(fig_loadings, use_container_width=True, key=generate_unique_key("pca_loadings_markers"))
+        else:
+            # Affichage 1D si seulement PC1 disponible
+            st.info("📊 Seule PC1 disponible - Affichage en 1D")
+            
+            fig_loadings_1d = px.scatter(
+                x=loadings_df['PC1'],
+                y=[0] * len(loadings_df),
+                color=loadings_df['Significatif'],
+                hover_name=loadings_df.index,
+                title="Projection 1D des marqueurs (PC1 uniquement)",
+                labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': 'Position'},
+                color_discrete_map={True: '#FF6B6B', False: 'lightgray'}
+            )
+            fig_loadings_1d.update_layout(height=400, yaxis=dict(showticklabels=False))
+            st.plotly_chart(fig_loadings_1d, use_container_width=True, key=generate_unique_key("pca_loadings_markers_1d"))
+    
+    # Tableau des top contributeurs parmi les marqueurs significatifs
+    st.subheader("🏆 Top contributeurs parmi les marqueurs significatifs")
+    
+    significant = loadings_df[loadings_df['Significatif']]
+    if not significant.empty:
+        top_significant = significant.nlargest(15, 'Distance')
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Top 15 marqueurs significatifs les plus discriminants:**")
+            if n_components >= 2:
+                display_cols = ['PC1', 'PC2', 'Distance']
+            else:
+                display_cols = ['PC1', 'Distance']
+            st.dataframe(
+                top_significant[display_cols].round(4),
+                use_container_width=True
+            )
+        
+        with col2:
+            # Graphique en barres des contributions
+            fig_contrib = px.bar(
+                x=top_significant['Distance'].values,
+                y=top_significant.index,
+                orientation='h',
+                title="Contribution des top marqueurs significatifs",
+                labels={'x': 'Distance (contribution)', 'y': 'Marqueur'},
+                color=top_significant['Distance'],
+                color_continuous_scale='Viridis'
+            )
+            fig_contrib.update_layout(height=400, showlegend=False)
+            st.plotly_chart(fig_contrib, use_container_width=True, key=generate_unique_key("contrib_significant_markers"))
+    
+    # Comparaison: significatifs vs non-significatifs
+    st.subheader("📊 Comparaison contributions: significatifs vs autres")
+    
+    non_significant = loadings_df[~loadings_df['Significatif']]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        avg_contrib_sig = significant['Distance'].mean() if not significant.empty else 0
+        st.metric("Contribution moyenne - Significatifs", f"{avg_contrib_sig:.3f}")
+    
+    with col2:
+        avg_contrib_other = non_significant['Distance'].mean() if not non_significant.empty else 0
+        st.metric("Contribution moyenne - Autres", f"{avg_contrib_other:.3f}")
+    
+    with col3:
+        ratio = avg_contrib_sig / avg_contrib_other if avg_contrib_other > 0 else 0
+        st.metric("Ratio (Sig/Autres)", f"{ratio:.2f}x")
+    
+    # Distribution des contributions
+    if not significant.empty and not non_significant.empty:
+        fig_dist = go.Figure()
+        
+        fig_dist.add_trace(go.Histogram(
+            x=significant['Distance'],
+            name='Marqueurs significatifs',
+            opacity=0.7,
+            marker_color='#FF6B6B',
+            nbinsx=20
+        ))
+        
+        fig_dist.add_trace(go.Histogram(
+            x=non_significant['Distance'],
+            name='Autres marqueurs',
+            opacity=0.7,
+            marker_color='lightgray',
+            nbinsx=20
+        ))
+        
+        fig_dist.update_layout(
+            title="Distribution des contributions (distance à l'origine)",
+            xaxis_title="Distance de contribution",
+            yaxis_title="Nombre de marqueurs",
+            barmode='overlay',
+            height=400
+        )
+        
+        st.plotly_chart(fig_dist, use_container_width=True, key=generate_unique_key("distribution_contributions"))
 
 def plot_markers_heatmap(matrix_df, significant_markers_df=None):
     """Heatmap des marqueurs significatifs"""
@@ -3417,8 +4121,7 @@ def main():
             
             st.info("ℹ️ Analyses basées sur les molécules uniques. Les adduits multiples ne sont comptés qu'une fois.")
             
-            samples_list = list(set([s for samples in features_df['samples'].dropna() 
-                                   for s in samples.split(',')]))
+            samples_list = list(set([s for samples in features_df['samples'].dropna() for s in samples.split(',')]))
             
             if len(samples_list) >= 2:
                 # Statistiques comparatives
@@ -3503,6 +4206,13 @@ def main():
                 st.subheader("🫧 Bubble plot - Intensités des molécules par niveau")
                 plot_level1_bubble_plot(features_df, samples_list)
                 
+                # NOUVEAU : Ajout du Volcano Plot dans la section comparaison
+                if matrix_df is not None:
+                    st.markdown("---")
+                    significant_markers = plot_volcano_plot(matrix_df)
+                else:
+                    significant_markers = None
+                
                 st.subheader("🎯 Comparaison multi-critères (radar)")
                 
                 available_metrics = [col for col in stats_df.columns if col not in ['Échantillon'] and stats_df[col].dtype in ['int64', 'float64']]
@@ -3585,6 +4295,54 @@ def main():
                 st.warning("Au moins 2 échantillons sont nécessaires pour la comparaison")
     
     elif st.session_state.active_tab == "statistics":
+        # VÉRIFICATION CRITIQUE AU DÉBUT
+        if matrix_df is None:
+            st.warning("""
+            ⚠️ Veuillez charger le fichier **feature_matrix.csv** pour accéder aux analyses statistiques avancées.
+            
+            Ce fichier doit contenir une matrice avec :
+            - Lignes : échantillons
+            - Colonnes : features (format : F0001_mz102.9880)
+            - Valeurs : intensités
+            """)
+            st.markdown("""
+            <div class="section-header">
+                <h2>📈 Analyses statistiques avancées</h2>
+                <p>Section non disponible - Chargez votre matrice feature_matrix.csv</p>
+            </div>
+            """, unsafe_allow_html=True)
+            return
+        
+        n_samples = len(matrix_df)
+        
+        if n_samples < 1:
+            st.error("❌ Aucun échantillon détecté dans la matrice")
+            return
+        
+        if n_samples == 1:
+            st.markdown("""
+            <div class="section-header">
+                <h2>📈 Analyses statistiques avancées</h2>
+                <p>Section non disponible avec un seul échantillon</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.error("""
+            ❌ **Les analyses statistiques ne sont pas disponibles avec un seul échantillon**
+            
+            Vous avez seulement **1 échantillon** dans votre matrice. Les analyses statistiques nécessitent au moins 2 échantillons pour :
+            - Calculer des corrélations
+            - Effectuer une PCA
+            - Faire du clustering
+            - Comparer des groupes
+            
+            💡 **Solutions :**
+            - Ajoutez plus d'échantillons à votre matrice
+            - Utilisez les autres sections de l'application (Vue d'ensemble, Analyse par échantillon, etc.)
+            """)
+            return
+        
+        # Section disponible pour 2+ échantillons
         st.markdown("""
         <div class="section-header">
             <h2>📈 Analyses statistiques avancées</h2>
@@ -3592,126 +4350,169 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # NOUVEAU : Sélecteur du type d'analyse
+        # Avertissement pour 2 échantillons
+        if n_samples == 2:
+            st.warning("""
+            ⚠️ **Analyses limitées avec 2 échantillons**
+            
+            Certaines analyses seront restreintes :
+            - PCA limitée à 1 composante principale
+            - t-SNE non disponible (minimum 3 échantillons requis)
+            - Clustering limité à 2 groupes maximum
+            - Comparaisons statistiques limitées
+            """)
+        
+        # CORRECTION : Sélecteur du type d'analyse CORRIGÉ
         analysis_type = st.selectbox(
             "Type d'analyse",
             ["Analyse par individus", "Analyse par marqueurs"],
             index=["Analyse par individus", "Analyse par marqueurs"].index(st.session_state.stats_analysis_type),
-            help="Choisissez entre l'analyse des individus ou l'analyse focalisée sur les marqueurs",
+            help="**Analyse par individus**: Analyse les échantillons (lignes de la matrice)\n**Analyse par marqueurs**: Analyse les features/marqueurs (colonnes de la matrice)",
             key="analysis_type_widget"
         )
         # Mettre à jour session_state
         st.session_state.stats_analysis_type = analysis_type
         
         if analysis_type == "Analyse par marqueurs":
-            st.info("🎯 Mode marqueurs : Analyses focalisées sur les features discriminants")
+            st.info("🎯 Mode marqueurs : Analyses focalisées sur les features/variables discriminants")
             
-            if matrix_df is not None:
-                # Section Volcano Plot
-                st.subheader("🌋 Volcano Plot")
-                plot_volcano_plot(matrix_df)
-                
-                # PCA des marqueurs significatifs
-                st.subheader("📊 PCA des marqueurs")
-                plot_markers_pca(matrix_df)
-                
-                # Heatmap des marqueurs
-                st.subheader("🔥 Heatmap des marqueurs")
-                plot_markers_heatmap(matrix_df)
-                
+            # Vérification spéciale pour l'analyse par marqueurs
+            if matrix_df.shape[1] < 2:
+                st.error("❌ Analyse par marqueurs impossible : moins de 2 features dans la matrice")
+                return
+            
+            # CORRECTION : PCA complète avec projection de TOUS les marqueurs
+            plot_complete_pca_with_loadings(matrix_df, analysis_type)
+            
+            st.markdown("---")
+            
+            # PCA des marqueurs significatifs avec projections (si disponibles depuis volcano plot)
+            if 'significant_markers' in locals() and significant_markers is not None:
+                st.subheader("🎯 PCA des marqueurs significatifs avec projection complète")
+                plot_markers_pca_with_projections(matrix_df, significant_markers)
             else:
-                st.warning("""
-                ⚠️ Veuillez charger le fichier **feature_matrix.csv** pour accéder aux analyses par marqueurs.
-                
-                Ce fichier doit contenir une matrice avec :
-                - Lignes : échantillons
-                - Colonnes : features (format : F0001_mz102.9880)
-                - Valeurs : intensités
-                """)
+                st.subheader("🎯 PCA des marqueurs avec projection complète")
+                plot_markers_pca_with_projections(matrix_df)
+            
+            st.markdown("---")
+            
+            # Heatmap des marqueurs
+            st.subheader("🔥 Heatmap des marqueurs")
+            if 'significant_markers' in locals() and significant_markers is not None:
+                plot_markers_heatmap(matrix_df, significant_markers)
+            else:
+                plot_markers_heatmap(matrix_df)
         
         else:  # Analyse par individus
-            if matrix_df is not None:
-                stat_section = st.selectbox(
-                    "Choisir une analyse:",
-                    ["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"],
-                    index=["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"].index(st.session_state.stats_section),
-                    key="stat_navigation_widget"
-                )
-                # Mettre à jour session_state
-                st.session_state.stats_section = stat_section
+            # NOUVEAU : Menu déroulant étendu pour l'analyse par individus
+            stat_section = st.selectbox(
+                "Choisir une analyse:",
+                ["📊 PCA & t-SNE", "🌋 Volcano Plot", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"],
+                index=["📊 PCA & t-SNE", "🌋 Volcano Plot", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"].index(st.session_state.stats_section) if st.session_state.stats_section in ["📊 PCA & t-SNE", "🌋 Volcano Plot", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"] else 0,
+                key="stat_navigation_widget"
+            )
+            # Mettre à jour session_state
+            st.session_state.stats_section = stat_section
+            
+            if stat_section == "📊 PCA & t-SNE":
+                st.subheader("📊 Analyse en Composantes Principales (PCA)")
                 
-                if stat_section == "📊 PCA & t-SNE":
-                    st.subheader("📊 Analyse en Composantes Principales (PCA)")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    pca_3d = st.checkbox(
+                        "Afficher PCA 3D", 
+                        value=st.session_state.stats_pca_3d, 
+                        key="pca_3d_checkbox_widget",
+                        disabled=n_samples < 3,
+                        help="PCA 3D nécessite au moins 3 échantillons" if n_samples < 3 else "Afficher la PCA en 3 dimensions"
+                    )
+                    # Mettre à jour session_state
+                    st.session_state.stats_pca_3d = pca_3d
+                with col2:
+                    show_loadings = st.checkbox(
+                        "Afficher les loadings", 
+                        value=st.session_state.stats_show_loadings, 
+                        key="show_loadings_checkbox_widget"
+                    )
+                    # Mettre à jour session_state
+                    st.session_state.stats_show_loadings = show_loadings
+                
+                if pca_3d and n_samples >= 3:
+                    plot_3d_pca(matrix_df, analysis_type)
+                else:
+                    if n_samples == 2 and pca_3d:
+                        st.info("📊 PCA 3D non disponible avec 2 échantillons. Affichage de la PCA 2D/1D.")
+                    # AJOUT DEMANDÉ : Afficher le plot PCA des individus dans l'analyse par individus
+                    perform_pca_analysis(matrix_df, analysis_type)
+                
+                if show_loadings:
+                    st.subheader("🔍 Contribution des features aux composantes principales")
                     
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        pca_3d = st.checkbox(
-                            "Afficher PCA 3D", 
-                            value=st.session_state.stats_pca_3d, 
-                            key="pca_3d_checkbox_widget"
+                    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], matrix_df.shape[0]), analysis_type=analysis_type)
+                    
+                    if pca is not None:
+                        n_components = min(3, pca.n_components_)
+                        loadings_df = pd.DataFrame(
+                            pca.components_[:n_components].T,
+                            columns=[f'PC{i+1}' for i in range(n_components)],
+                            index=matrix_df.columns
                         )
-                        # Mettre à jour session_state
-                        st.session_state.stats_pca_3d = pca_3d
-                    with col2:
-                        show_loadings = st.checkbox(
-                            "Afficher les loadings", 
-                            value=st.session_state.stats_show_loadings, 
-                            key="show_loadings_checkbox_widget"
-                        )
-                        # Mettre à jour session_state
-                        st.session_state.stats_show_loadings = show_loadings
-                    
-                    if pca_3d:
-                        plot_3d_pca(matrix_df, analysis_type)
-                    else:
-                        perform_pca_analysis(matrix_df, analysis_type)
-                    
-                    if show_loadings:
-                        st.subheader("Contribution des features aux composantes principales")
                         
-                        pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], matrix_df.shape[0]))
-                        
-                        if pca is not None:
-                            n_components = min(3, pca.n_components_)
-                            loadings_df = pd.DataFrame(
-                                pca.components_[:n_components].T,
-                                columns=[f'PC{i+1}' for i in range(n_components)],
-                                index=matrix_df.columns
-                            )
-                            
-                            for i in range(n_components):
-                                pc = f'PC{i+1}'
-                                st.write(f"**Top 10 contributeurs à {pc}:**")
-                                top_features = loadings_df[pc].abs().nlargest(10)
-                                st.dataframe(top_features.round(3))
-                    
-                    st.markdown("---")
-                    
-                    st.subheader("🌐 Analyse t-SNE")
+                        for i in range(n_components):
+                            pc = f'PC{i+1}'
+                            st.write(f"**Top 10 contributeurs à {pc}:**")
+                            top_features = loadings_df[pc].abs().nlargest(10)
+                            st.dataframe(top_features.round(3))
+                
+                st.markdown("---")
+                
+                st.subheader("🌐 Analyse t-SNE")
+                if n_samples < 3:
+                    st.error("❌ t-SNE non disponible : nécessite au moins 3 échantillons")
+                    st.info("💡 Utilisez la PCA pour analyser vos données avec 2 échantillons.")
+                else:
                     plot_tsne_analysis(matrix_df, analysis_type)
+            
+            elif stat_section == "🌋 Volcano Plot":
+                # NOUVEAU : Section dédiée au Volcano Plot dans l'analyse par individus
+                if n_samples < 2:
+                    st.error("❌ Volcano Plot non disponible avec moins de 2 échantillons")
+                else:
+                    plot_volcano_plot(matrix_df)
+            
+            elif stat_section == "🔍 Clustering":
+                st.subheader("🔍 Analyses de clustering")
                 
-                elif stat_section == "🔍 Clustering":
-                    st.subheader("🔍 Analyses de clustering")
-                    
-                    st.subheader("K-means Clustering")
+                if n_samples < 2:
+                    st.error("❌ Clustering impossible avec moins de 2 échantillons")
+                else:
+                    st.subheader("🎯 K-means Clustering")
                     perform_kmeans_clustering(matrix_df, analysis_type)
                     
                     st.markdown("---")
                     
-                    st.subheader("Clustering hiérarchique")
+                    st.subheader("🌳 Clustering hiérarchique")
                     st.info("Cette analyse utilise les molécules identifiées du fichier features")
                     if features_df is not None:
                         samples_list = list(set([s for samples in features_df['samples'].dropna() 
-                                               for s in samples.split(',')]))
-                        plot_hierarchical_clustering(features_df, samples_list)
+                                            for s in samples.split(',')]))
+                        if len(samples_list) >= 2:
+                            plot_hierarchical_clustering(features_df, samples_list)
+                        else:
+                            st.error("❌ Clustering hiérarchique impossible : moins de 2 échantillons dans les données features")
+                    else:
+                        st.warning("⚠️ Données features non chargées - clustering hiérarchique non disponible")
+            
+            elif stat_section == "📈 Corrélations":
+                st.subheader("📈 Analyses de corrélation")
                 
-                elif stat_section == "📈 Corrélations":
-                    st.subheader("📈 Analyses de corrélation")
-                    
+                if n_samples < 2:
+                    st.error("❌ Analyse de corrélation impossible avec moins de 2 échantillons")
+                else:
                     corr_matrix = plot_correlation_heatmap(matrix_df, analysis_type)
                     
                     if corr_matrix is not None:
-                        st.subheader("Statistiques de corrélation")
+                        st.subheader("📊 Statistiques de corrélation")
                         
                         if analysis_type == "Analyse par marqueurs":
                             # Pour les marqueurs, analyser toutes les corrélations
@@ -3739,18 +4540,24 @@ def main():
                             with col4:
                                 st.metric("Corrélation min", f"{min(corr_values):.3f}")
                             
-                            fig_corr_dist = px.histogram(
-                                x=corr_values,
-                                nbins=30,
-                                title=f"Distribution des corrélations{title_suffix}",
-                                labels={'x': 'Coefficient de corrélation', 'y': 'Fréquence'},
-                                color_discrete_sequence=DISTINCT_COLORS
-                            )
-                            st.plotly_chart(fig_corr_dist, use_container_width=True, key=generate_unique_key("correlation_distribution"))
+                            if len(corr_values) > 1:  # Au moins 2 valeurs pour faire un histogramme
+                                fig_corr_dist = px.histogram(
+                                    x=corr_values,
+                                    nbins=min(30, len(corr_values)),
+                                    title=f"Distribution des corrélations{title_suffix}",
+                                    labels={'x': 'Coefficient de corrélation', 'y': 'Fréquence'},
+                                    color_discrete_sequence=DISTINCT_COLORS
+                                )
+                                st.plotly_chart(fig_corr_dist, use_container_width=True, key=generate_unique_key("correlation_distribution"))
+                            else:
+                                st.info(f"📊 Une seule valeur de corrélation disponible : {corr_values[0]:.3f}")
+            
+            elif stat_section == "🎨 Heatmaps":
+                st.subheader("🎨 Heatmaps avancées")
                 
-                elif stat_section == "🎨 Heatmaps":
-                    st.subheader("🎨 Heatmaps avancées")
-                    
+                if n_samples < 2:
+                    st.error("❌ Heatmaps impossibles avec moins de 2 échantillons")
+                else:
                     st.subheader("🔥 Heatmap des intensités")
                     
                     transform_option = st.selectbox(
@@ -3762,101 +4569,102 @@ def main():
                     # Mettre à jour session_state
                     st.session_state.stats_heatmap_transform = transform_option
                     
-                    if transform_option == "Log10":
-                        matrix_transformed = np.log10(matrix_df + 1)
-                        title_suffix = "(échelle log)"
-                    elif transform_option == "Z-score":
-                        scaler = StandardScaler()
-                        matrix_transformed = pd.DataFrame(
-                            scaler.fit_transform(matrix_df.T).T,
-                            index=matrix_df.index,
-                            columns=matrix_df.columns
+                    try:
+                        if transform_option == "Log10":
+                            matrix_transformed = np.log10(matrix_df + 1)
+                            title_suffix = "(échelle log)"
+                        elif transform_option == "Z-score":
+                            scaler = StandardScaler()
+                            matrix_transformed = pd.DataFrame(
+                                scaler.fit_transform(matrix_df.T).T,
+                                index=matrix_df.index,
+                                columns=matrix_df.columns
+                            )
+                            title_suffix = "(Z-score)"
+                        elif transform_option == "Min-Max":
+                            from sklearn.preprocessing import MinMaxScaler
+                            scaler = MinMaxScaler()
+                            matrix_transformed = pd.DataFrame(
+                                scaler.fit_transform(matrix_df.T).T,
+                                index=matrix_df.index,
+                                columns=matrix_df.columns
+                            )
+                            title_suffix = "(Min-Max normalisé)"
+                        else:
+                            matrix_transformed = matrix_df
+                            title_suffix = ""
+                        
+                        max_features = min(100, len(matrix_df.columns))
+                        n_features = st.slider(
+                            "Nombre de features à afficher",
+                            10, max_features, 
+                            min(st.session_state.stats_heatmap_features, max_features),
+                            key="heatmap_features_widget"
                         )
-                        title_suffix = "(Z-score)"
-                    elif transform_option == "Min-Max":
-                        from sklearn.preprocessing import MinMaxScaler
-                        scaler = MinMaxScaler()
-                        matrix_transformed = pd.DataFrame(
-                            scaler.fit_transform(matrix_df.T).T,
-                            index=matrix_df.index,
-                            columns=matrix_df.columns
+                        # Mettre à jour session_state
+                        st.session_state.stats_heatmap_features = n_features
+                        
+                        feature_var = matrix_transformed.var(axis=0).nlargest(n_features)
+                        selected_features = feature_var.index
+                        
+                        matrix_subset = matrix_transformed[selected_features]
+                        
+                        fig = px.imshow(
+                            matrix_subset,
+                            labels=dict(x="Features", y="Échantillons", color=f"Intensité {title_suffix}"),
+                            title=f"Heatmap des intensités {title_suffix}",
+                            aspect="auto",
+                            color_continuous_scale='Viridis'
                         )
-                        title_suffix = "(Min-Max normalisé)"
-                    else:
-                        matrix_transformed = matrix_df
-                        title_suffix = ""
-                    
-                    max_features = min(100, len(matrix_df.columns))
-                    n_features = st.slider(
-                        "Nombre de features à afficher",
-                        10, max_features, 
-                        min(st.session_state.stats_heatmap_features, max_features),
-                        key="heatmap_features_widget"
-                    )
-                    # Mettre à jour session_state
-                    st.session_state.stats_heatmap_features = n_features
-                    
-                    feature_var = matrix_transformed.var(axis=0).nlargest(n_features)
-                    selected_features = feature_var.index
-                    
-                    matrix_subset = matrix_transformed[selected_features]
-                    
-                    fig = px.imshow(
-                        matrix_subset,
-                        labels=dict(x="Features", y="Échantillons", color=f"Intensité {title_suffix}"),
-                        title=f"Heatmap des intensités {title_suffix}",
-                        aspect="auto",
-                        color_continuous_scale='Viridis'
-                    )
-                    
-                    fig.update_layout(height=600)
-                    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("advanced_heatmap"))
+                        
+                        fig.update_layout(height=600)
+                        st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("advanced_heatmap"))
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de la transformation des données : {str(e)}")
                     
                     st.subheader("📏 Heatmap des distances entre échantillons")
                     
-                    distance_metric = st.selectbox(
-                        "Métrique de distance",
-                        ["Euclidienne", "Cosinus"],
-                        index=["Euclidienne", "Cosinus"].index(st.session_state.stats_distance_metric),
-                        key="distance_metric_widget"
-                    )
-                    # Mettre à jour session_state
-                    st.session_state.stats_distance_metric = distance_metric
-                    
-                    from scipy.spatial.distance import pdist, squareform
-                    
-                    if distance_metric == "Euclidienne":
-                        distances = pdist(matrix_df.values, metric='euclidean')
+                    if n_samples >= 2:
+                        distance_metric = st.selectbox(
+                            "Métrique de distance",
+                            ["Euclidienne", "Cosinus"],
+                            index=["Euclidienne", "Cosinus"].index(st.session_state.stats_distance_metric),
+                            key="distance_metric_widget"
+                        )
+                        # Mettre à jour session_state
+                        st.session_state.stats_distance_metric = distance_metric
+                        
+                        try:
+                            from scipy.spatial.distance import pdist, squareform
+                            
+                            if distance_metric == "Euclidienne":
+                                distances = pdist(matrix_df.values, metric='euclidean')
+                            else:
+                                distances = pdist(matrix_df.values, metric='cosine')
+                            
+                            distance_matrix = squareform(distances)
+                            distance_df = pd.DataFrame(
+                                distance_matrix,
+                                index=matrix_df.index,
+                                columns=matrix_df.index
+                            )
+                            
+                            fig_dist = px.imshow(
+                                distance_df,
+                                text_auto=".2f",
+                                aspect="auto",
+                                title=f"Matrice de distance {distance_metric.lower()} entre échantillons",
+                                color_continuous_scale='Plasma'
+                            )
+                            
+                            fig_dist.update_layout(height=600)
+                            st.plotly_chart(fig_dist, use_container_width=True, key=generate_unique_key("distance_heatmap"))
+                            
+                        except Exception as e:
+                            st.error(f"❌ Erreur lors du calcul des distances : {str(e)}")
                     else:
-                        distances = pdist(matrix_df.values, metric='cosine')
-                    
-                    distance_matrix = squareform(distances)
-                    distance_df = pd.DataFrame(
-                        distance_matrix,
-                        index=matrix_df.index,
-                        columns=matrix_df.index
-                    )
-                    
-                    fig_dist = px.imshow(
-                        distance_df,
-                        text_auto=".2f",
-                        aspect="auto",
-                        title=f"Matrice de distance {distance_metric.lower()} entre échantillons",
-                        color_continuous_scale='Plasma'
-                    )
-                    
-                    fig_dist.update_layout(height=600)
-                    st.plotly_chart(fig_dist, use_container_width=True, key=generate_unique_key("distance_heatmap"))
-                
-            else:
-                st.warning("""
-                ⚠️ Veuillez charger le fichier **feature_matrix.csv** pour accéder aux analyses statistiques avancées.
-                
-                Ce fichier doit contenir une matrice avec :
-                - Lignes : échantillons
-                - Colonnes : features (format : F0001_mz102.9880)
-                - Valeurs : intensités
-                """)
+                        st.info("📊 Heatmap de distances non disponible avec moins de 2 échantillons")
     
     elif st.session_state.active_tab == "reports":
         if features_df is None:
