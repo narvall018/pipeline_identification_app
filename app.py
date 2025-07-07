@@ -1897,14 +1897,14 @@ def perform_pca_analysis(matrix_df, analysis_type="Analyse par individus"):
         st.plotly_chart(fig1, use_container_width=True, key=generate_unique_key("pca_variance_plot"))
     
     with col2:
-        # Score plot PCA CORRIGÉ
+        # Score plot PCA CORRIGÉ - AVEC GESTION DU CAS 1D
+        if analysis_type == "Analyse par marqueurs":
+            labels_for_plot = matrix_df.columns  # Noms des marqueurs
+        else:
+            labels_for_plot = matrix_df.index  # Noms des échantillons
+        
         if X_pca.shape[1] >= 2:
-            # CORRECTION : Adapter les labels selon le type d'analyse
-            if analysis_type == "Analyse par marqueurs":
-                labels_for_plot = matrix_df.columns  # Noms des marqueurs
-            else:
-                labels_for_plot = matrix_df.index  # Noms des échantillons
-            
+            # PCA 2D
             fig2 = px.scatter(
                 x=X_pca[:, 0],
                 y=X_pca[:, 1],
@@ -1913,8 +1913,26 @@ def perform_pca_analysis(matrix_df, analysis_type="Analyse par individus"):
                 labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': f'PC2 ({variance_ratio[1]*100:.1f}%)'},
                 color_discrete_sequence=DISTINCT_COLORS
             )
-            fig2.update_traces(textposition="top center")
+            fig2.update_traces(textposition="top center", marker=dict(size=12))
+            fig2.update_layout(height=500)
             st.plotly_chart(fig2, use_container_width=True, key=generate_unique_key("pca_score_plot"))
+        
+        elif X_pca.shape[1] == 1:
+            # PCA 1D - AJOUT DE CE CAS MANQUANT
+            fig2 = px.scatter(
+                x=X_pca[:, 0],
+                y=[0] * len(X_pca),
+                text=labels_for_plot,
+                title=f"Score plot PCA 1D{title_suffix} (PC1: {variance_ratio[0]*100:.1f}%)",
+                labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': 'Position'},
+                color_discrete_sequence=DISTINCT_COLORS
+            )
+            fig2.update_traces(textposition="top center", marker=dict(size=12))
+            fig2.update_layout(height=400, yaxis=dict(showticklabels=False))
+            st.plotly_chart(fig2, use_container_width=True, key=generate_unique_key("pca_score_plot_1d"))
+        
+        else:
+            st.warning("❌ Aucune composante PCA disponible pour l'affichage")
     
     # AJOUT CORRECTION : Afficher les loadings pour l'analyse par individus
     if analysis_type == "Analyse par individus":
