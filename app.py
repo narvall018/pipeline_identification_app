@@ -444,6 +444,88 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Fonction pour initialiser les paramètres de filtres
+def init_filter_params():
+    """Initialise tous les paramètres de filtres dans session_state s'ils n'existent pas"""
+    
+    # Paramètres pour l'onglet sample
+    if 'sample_intensity_min' not in st.session_state:
+        st.session_state.sample_intensity_min = 0.0
+    if 'sample_conf_levels' not in st.session_state:
+        st.session_state.sample_conf_levels = [1]
+    if 'sample_cat_filter' not in st.session_state:
+        st.session_state.sample_cat_filter = []
+    
+    # Paramètres pour l'onglet molecules
+    if 'molecules_samples_filter' not in st.session_state:
+        st.session_state.molecules_samples_filter = []
+    if 'molecules_conf_filter' not in st.session_state:
+        st.session_state.molecules_conf_filter = []
+    if 'molecules_sort_by' not in st.session_state:
+        st.session_state.molecules_sort_by = "Nom"
+    
+    # Paramètres pour l'onglet detection
+    if 'detection_conf_levels' not in st.session_state:
+        st.session_state.detection_conf_levels = [1, 2, 3, 4, 5]
+    if 'detection_samples_filter' not in st.session_state:
+        st.session_state.detection_samples_filter = []
+    if 'detection_categories_filter' not in st.session_state:
+        st.session_state.detection_categories_filter = []
+    if 'detection_radar_conf_levels' not in st.session_state:
+        st.session_state.detection_radar_conf_levels = [1, 2, 3, 4, 5]
+    
+    # Paramètres pour l'onglet comparison
+    if 'comparison_preset_conf' not in st.session_state:
+        st.session_state.comparison_preset_conf = "Niveaux 1+2+3"
+    if 'comparison_manual_conf' not in st.session_state:
+        st.session_state.comparison_manual_conf = [1, 2, 3]
+    if 'comparison_bubble_levels' not in st.session_state:
+        st.session_state.comparison_bubble_levels = [1]
+    if 'comparison_jaccard_conf' not in st.session_state:
+        st.session_state.comparison_jaccard_conf = [1, 2, 3]
+    if 'comparison_jaccard_samples' not in st.session_state:
+        st.session_state.comparison_jaccard_samples = []
+    if 'comparison_radar_metrics' not in st.session_state:
+        st.session_state.comparison_radar_metrics = []
+    
+    # Paramètres pour l'onglet statistics
+    if 'stats_section' not in st.session_state:
+        st.session_state.stats_section = "📊 PCA & t-SNE"
+    if 'stats_pca_3d' not in st.session_state:
+        st.session_state.stats_pca_3d = True
+    if 'stats_show_loadings' not in st.session_state:
+        st.session_state.stats_show_loadings = False
+    if 'stats_tsne_perplexity' not in st.session_state:
+        st.session_state.stats_tsne_perplexity = 5
+    if 'stats_kmeans_clusters' not in st.session_state:
+        st.session_state.stats_kmeans_clusters = 3
+    if 'stats_heatmap_transform' not in st.session_state:
+        st.session_state.stats_heatmap_transform = "Aucune"
+    if 'stats_heatmap_features' not in st.session_state:
+        st.session_state.stats_heatmap_features = 50
+    if 'stats_distance_metric' not in st.session_state:
+        st.session_state.stats_distance_metric = "Euclidienne"
+    
+    # Paramètres pour l'onglet reports
+    if 'reports_identified_only' not in st.session_state:
+        st.session_state.reports_identified_only = True
+    if 'reports_aggregate' not in st.session_state:
+        st.session_state.reports_aggregate = True
+    if 'reports_conf_levels' not in st.session_state:
+        st.session_state.reports_conf_levels = [1, 2, 3]
+    if 'reports_samples' not in st.session_state:
+        st.session_state.reports_samples = []
+    if 'reports_columns' not in st.session_state:
+        st.session_state.reports_columns = []
+    if 'reports_include_stats' not in st.session_state:
+        st.session_state.reports_include_stats = False
+    if 'reports_include_summary' not in st.session_state:
+        st.session_state.reports_include_summary = True
+    
+    # Paramètres pour l'onglet confidence
+    if 'confidence_selected_level' not in st.session_state:
+        st.session_state.confidence_selected_level = 1
+
 # Fonctions utilitaires améliorées et optimisées
 def generate_unique_key(base_key):
     """Génère une clé unique en utilisant UUID pour éviter les collisions"""
@@ -791,17 +873,26 @@ def plot_level1_bubble_plot_sample(df, sample_name):
         st.warning("Colonne confidence_level non trouvée")
         return
     
-    # Sélecteur de niveaux de confiance
+    # Sélecteur de niveaux de confiance avec mémorisation
     col1, col2 = st.columns([1, 3])
     with col1:
         available_levels = sorted([1, 2, 3])  # Seulement 1, 2, 3
+        
+        # Initialiser dans session_state si pas encore fait
+        session_key = f"bubble_levels_{sample_name}"
+        if session_key not in st.session_state:
+            st.session_state[session_key] = [1]
+        
         selected_levels = st.multiselect(
             "Niveaux de confiance",
             options=available_levels,
-            default=[1],
+            default=st.session_state[session_key],
             help="Sélectionnez les niveaux à inclure",
-            key=f"bubble_levels_{sample_name}_fixed"  # CLÉ FIXE avec nom d'échantillon
+            key=f"bubble_levels_{sample_name}_widget"
         )
+        
+        # Mettre à jour session_state
+        st.session_state[session_key] = selected_levels
     
     with col2:
         if not selected_levels:
@@ -848,7 +939,7 @@ def plot_level1_bubble_plot_sample(df, sample_name):
         yaxis_title=f"Molécules (Niveaux {selected_levels})"
     )
     
-    st.plotly_chart(fig, use_container_width=True, key=f"level_bubble_{sample_name}_fixed")  # CLÉ FIXE avec nom d'échantillon
+    st.plotly_chart(fig, use_container_width=True, key=f"level_bubble_{sample_name}_persistent")
     
     # Afficher quelques statistiques
     col1, col2, col3 = st.columns(3)
@@ -1199,12 +1290,12 @@ def plot_confidence_levels_distribution(df):
     return None
 
 def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=None):
-    """Visualisation des niveaux de confiance à travers les échantillons avec filtres"""
+    """Visualisation des niveaux de confiance à travers les échantillons avec filtres PERSISTANTS - CORRECTION ICI"""
     if 'confidence_level' not in df.columns:
         st.warning("Colonne confidence_level non trouvée")
         return
     
-    # Filtres pour sélectionner les niveaux
+    # Filtres pour sélectionner les niveaux avec persistance
     st.subheader("🎯 Filtres de niveaux de confiance")
     
     col1, col2 = st.columns(2)
@@ -1221,9 +1312,16 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
         preset_choice = st.selectbox(
             "Sélection rapide",
             options=list(preset_options.keys()),
-            index=2,  # Par défaut "Niveaux 1+2+3"
-            key="preset_confidence_levels_fixed"  # Clé FIXE au lieu de dynamique
+            index=list(preset_options.keys()).index(st.session_state.comparison_preset_conf),
+            key="preset_confidence_levels_widget"
         )
+        
+        # CORRECTION : Détecter si le preset a changé et mettre à jour la sélection manuelle
+        if preset_choice != st.session_state.comparison_preset_conf:
+            st.session_state.comparison_preset_conf = preset_choice
+            st.session_state.comparison_manual_conf = preset_options[preset_choice]
+            # Forcer le rerun pour mettre à jour l'interface
+            st.rerun()
         
         selected_levels_from_preset = preset_options[preset_choice]
     
@@ -1232,13 +1330,17 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
         manual_levels = st.multiselect(
             "Sélection manuelle (remplace la sélection rapide)",
             options=[1, 2, 3, 4, 5],
-            default=selected_levels_from_preset,
+            default=st.session_state.comparison_manual_conf,
             help="Personnalisez votre sélection de niveaux",
-            key="manual_confidence_levels_fixed"  # Clé FIXE au lieu de dynamique
+            key="manual_confidence_levels_widget"
         )
         
-        # Utiliser la sélection manuelle si elle diffère du preset
-        if manual_levels:  # S'assurer que manual_levels n'est pas vide
+        # Mettre à jour session_state
+        if manual_levels != st.session_state.comparison_manual_conf:
+            st.session_state.comparison_manual_conf = manual_levels
+        
+        # Utiliser la sélection manuelle si elle existe, sinon le preset
+        if manual_levels:  
             selected_levels_final = manual_levels
         else:
             selected_levels_final = selected_levels_from_preset
@@ -1280,25 +1382,28 @@ def plot_confidence_comparison_across_samples(df, samples_list, selected_levels=
     )
     
     fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True, key="confidence_comparison_across_samples_fixed")  # Clé FIXE
+    st.plotly_chart(fig, use_container_width=True, key="confidence_comparison_across_samples_persistent")
 
 def plot_level1_bubble_plot(df, samples_list):
-    """Bubble plot pour les molécules avec choix de niveaux de confiance"""
+    """Bubble plot pour les molécules avec choix de niveaux de confiance PERSISTANT"""
     if 'confidence_level' not in df.columns:
         st.warning("Colonne confidence_level non trouvée")
         return
     
-    # Sélecteur de niveaux de confiance
+    # Sélecteur de niveaux de confiance avec persistance
     col1, col2 = st.columns([1, 3])
     with col1:
         available_levels = sorted([1, 2, 3])  # Seulement 1, 2, 3
         selected_levels = st.multiselect(
             "Niveaux de confiance",
             options=available_levels,
-            default=[1],
+            default=st.session_state.comparison_bubble_levels,
             help="Sélectionnez les niveaux à inclure",
-            key="bubble_levels_comparison_fixed"  # CLÉ FIXE au lieu de dynamique
+            key="bubble_levels_comparison_widget"
         )
+        
+        # Mettre à jour session_state
+        st.session_state.comparison_bubble_levels = selected_levels
     
     with col2:
         if not selected_levels:
@@ -1363,7 +1468,7 @@ def plot_level1_bubble_plot(df, samples_list):
         yaxis={'categoryorder': 'total ascending'}
     )
     
-    st.plotly_chart(fig, use_container_width=True, key="level_bubble_plot_comparison_fixed")  # CLÉ FIXE
+    st.plotly_chart(fig, use_container_width=True, key="level_bubble_plot_comparison_persistent")
 
 def calculate_jaccard_similarity(df, samples_list):
     """Calcule la similarité de Jaccard entre échantillons"""
@@ -1394,7 +1499,7 @@ def calculate_jaccard_similarity(df, samples_list):
     return jaccard_matrix.astype(float)
 
 def plot_hierarchical_clustering(df, samples_list, confidence_levels=None, selected_samples=None):
-    """Clustering hiérarchique des échantillons avec filtrage par niveau de confiance"""
+    """Clustering hiérarchique des échantillons avec filtrage par niveau de confiance PERSISTANT"""
     # Filtrer par échantillons sélectionnés
     filtered_samples = samples_list
     if selected_samples and len(selected_samples) > 0:
@@ -1563,7 +1668,7 @@ def plot_3d_pca(matrix_df):
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_3d_plot"))
 
 def plot_tsne_analysis(matrix_df):
-    """Analyse t-SNE avec gestion d'erreur"""
+    """Analyse t-SNE avec gestion d'erreur et PERSISTANCE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
@@ -1580,15 +1685,18 @@ def plot_tsne_analysis(matrix_df):
     if max_perplexity < 5:
         max_perplexity = min(5, n_samples - 1)
     
-    # Paramètres t-SNE
+    # Paramètres t-SNE avec persistance
     perplexity = st.slider(
         "Perplexité t-SNE", 
         1, 
         max_perplexity, 
-        min(max_perplexity, 5),
+        min(max_perplexity, st.session_state.stats_tsne_perplexity),
         help=f"Maximum possible: {max_perplexity} (basé sur {n_samples} échantillons)",
-        key=f"tsne_perplexity_{generate_unique_key('tsne')}"
+        key="tsne_perplexity_widget"
     )
+    
+    # Mettre à jour session_state
+    st.session_state.stats_tsne_perplexity = perplexity
     
     # Standardisation
     scaler = StandardScaler()
@@ -1704,7 +1812,7 @@ def plot_correlation_heatmap(matrix_df):
     return corr_matrix
 
 def perform_kmeans_clustering(matrix_df):
-    """Clustering K-means sur la matrice des features avec validation du nombre de clusters"""
+    """Clustering K-means sur la matrice des features avec validation du nombre de clusters et PERSISTANCE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
@@ -1723,15 +1831,18 @@ def perform_kmeans_clustering(matrix_df):
         n_clusters = 2
         st.info(f"Avec seulement {n_samples} échantillons, le nombre de clusters est fixé à {n_clusters}.")
     else:
-        # Sélection du nombre de clusters avec validation
+        # Sélection du nombre de clusters avec validation et persistance
         n_clusters = st.slider(
             "Nombre de clusters", 
             2, 
             max_clusters, 
-            min(3, max_clusters), 
+            min(st.session_state.stats_kmeans_clusters, max_clusters), 
             help=f"Maximum possible: {max_clusters} (basé sur {n_samples} échantillons)",
-            key=f"kmeans_clusters_{generate_unique_key('kmeans')}"
+            key="kmeans_clusters_widget"
         )
+        
+        # Mettre à jour session_state
+        st.session_state.stats_kmeans_clusters = n_clusters
     
     # Vérification de sécurité
     if n_clusters > n_samples:
@@ -2117,13 +2228,16 @@ def create_navigation(current_tab):
 def main():
     st.title("🧪 Analyse et visualisation des données de HRMS")
     
-    # Initialiser les états de session
+    # Initialiser les états de session ET les paramètres de filtres
     if 'features_df' not in st.session_state:
         st.session_state.features_df = None
     if 'matrix_df' not in st.session_state:
         st.session_state.matrix_df = None
     if 'active_tab' not in st.session_state:
         st.session_state.active_tab = "home"
+    
+    # Initialiser tous les paramètres de filtres
+    init_filter_params()
     
     # Sidebar pour les uploads
     st.sidebar.header("📁 Chargement des fichiers")
@@ -2153,6 +2267,27 @@ def main():
                 features_df = load_features_data(features_file)
                 st.session_state.features_df = features_df
             st.sidebar.success(f"✅ Features chargées : {len(features_df)} lignes")
+            
+            # Mettre à jour les listes d'échantillons dans les filtres persistants
+            samples_list = list(set([s for samples in features_df['samples'].dropna() 
+                                   for s in samples.split(',')]))
+            
+            # Initialiser les filtres avec les vrais échantillons si ce n'est pas encore fait
+            if not st.session_state.molecules_samples_filter:
+                st.session_state.molecules_samples_filter = samples_list
+            if not st.session_state.detection_samples_filter:
+                st.session_state.detection_samples_filter = samples_list
+            if not st.session_state.comparison_jaccard_samples:
+                st.session_state.comparison_jaccard_samples = samples_list
+            if not st.session_state.reports_samples:
+                st.session_state.reports_samples = samples_list
+            
+            # Mettre à jour les filtres de confiance avec les vrais niveaux disponibles
+            if 'confidence_level' in features_df.columns:
+                available_levels = sorted(features_df['confidence_level'].dropna().unique())
+                if not st.session_state.molecules_conf_filter:
+                    st.session_state.molecules_conf_filter = available_levels
+            
         except Exception as e:
             st.sidebar.error(f"❌ Erreur de chargement : {str(e)}")
             features_df = None
@@ -2462,7 +2597,7 @@ def main():
                     if not aggregated_display.empty:
                         st.info(f"Affichage de {len(aggregated_display)} molécules uniques (adduits automatiquement groupés)")
                         
-                        # Filtres
+                        # Filtres avec persistance pour l'échantillon
                         with st.expander("Filtres avancés"):
                             col1, col2, col3 = st.columns(3)
                             
@@ -2471,18 +2606,22 @@ def main():
                                 intensity_min = st.number_input(
                                     f"Intensité minimale ({intensity_column})",
                                     min_value=0.0,
-                                    value=0.0,
-                                    key="intensity_min_sample"
+                                    value=st.session_state.sample_intensity_min,
+                                    key="intensity_min_sample_widget"
                                 )
+                                # Mettre à jour session_state
+                                st.session_state.sample_intensity_min = intensity_min
                             
                             with col2:
                                 if 'confidence_level' in aggregated_display.columns:
                                     conf_levels = st.multiselect(
                                         "Niveaux de confiance",
                                         options=[1, 2, 3, 4, 5],
-                                        default=[1],
-                                        key="conf_levels_sample"
+                                        default=st.session_state.sample_conf_levels,
+                                        key="conf_levels_sample_widget"
                                     )
+                                    # Mettre à jour session_state
+                                    st.session_state.sample_conf_levels = conf_levels
                             
                             with col3:
                                 if 'categories' in aggregated_display.columns:
@@ -2493,8 +2632,11 @@ def main():
                                     cat_filter = st.multiselect(
                                         "Catégories",
                                         options=list(set(all_cats)),
-                                        key="cat_filter_sample"
+                                        default=st.session_state.sample_cat_filter,
+                                        key="cat_filter_sample_widget"
                                     )
+                                    # Mettre à jour session_state
+                                    st.session_state.sample_cat_filter = cat_filter
                         
                         # Appliquer les filtres
                         filtered_data = aggregated_display[aggregated_display[intensity_column] >= intensity_min]
@@ -2602,7 +2744,7 @@ def main():
             identified_molecules = features_df[features_df['match_name'].notna()]
             
             if not identified_molecules.empty:
-                # Filtres
+                # Filtres avec persistance
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
@@ -2611,25 +2753,32 @@ def main():
                     selected_samples_filter = st.multiselect(
                         "Filtrer par échantillons",
                         options=samples_list,
-                        default=samples_list,
-                        key="samples_filter_molecules"
+                        default=st.session_state.molecules_samples_filter,
+                        key="samples_filter_molecules_widget"
                     )
+                    # Mettre à jour session_state
+                    st.session_state.molecules_samples_filter = selected_samples_filter
                 
                 with col2:
                     if 'confidence_level' in identified_molecules.columns:
                         conf_filter = st.multiselect(
                             "Niveaux de confiance",
                             options=sorted(identified_molecules['confidence_level'].dropna().unique()),
-                            default=sorted(identified_molecules['confidence_level'].dropna().unique()),
-                            key="conf_filter_molecules"
+                            default=st.session_state.molecules_conf_filter,
+                            key="conf_filter_molecules_widget"
                         )
+                        # Mettre à jour session_state
+                        st.session_state.molecules_conf_filter = conf_filter
                 
                 with col3:
                     sort_by = st.selectbox(
                         "Trier par",
                         ["Nom", "Confiance", "Intensité"],
-                        key="sort_by_molecules"
+                        index=["Nom", "Confiance", "Intensité"].index(st.session_state.molecules_sort_by),
+                        key="sort_by_molecules_widget"
                     )
+                    # Mettre à jour session_state
+                    st.session_state.molecules_sort_by = sort_by
                 
                 # Appliquer les filtres
                 filtered_molecules = identified_molecules.copy()
@@ -2806,9 +2955,11 @@ def main():
                 confidence_levels_choice = st.multiselect(
                     "Inclure les niveaux de confiance",
                     options=[1, 2, 3, 4, 5],
-                    default=[1, 2, 3, 4, 5],
-                    key="conf_levels_detection"
+                    default=st.session_state.detection_conf_levels,
+                    key="conf_levels_detection_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.detection_conf_levels = confidence_levels_choice
             
             with col2:
                 st.info(f"Niveaux sélectionnés : {', '.join(map(str, confidence_levels_choice))}")
@@ -2850,23 +3001,27 @@ def main():
                 
                 detection_df = pd.DataFrame(detection_df_data)
                 
-                # Filtres
+                # Filtres avec persistance
                 col1, col2 = st.columns(2)
                 with col1:
                     selected_samples = st.multiselect(
                         "Filtrer par échantillons",
                         samples_list,
-                        default=samples_list,
-                        key="samples_filter_detection"
+                        default=st.session_state.detection_samples_filter,
+                        key="samples_filter_detection_widget"
                     )
+                    # Mettre à jour session_state
+                    st.session_state.detection_samples_filter = selected_samples
                 
                 with col2:
                     selected_categories = st.multiselect(
                         "Filtrer par catégories",
                         list(DATABASE_CATEGORIES.keys()),
-                        default=list(DATABASE_CATEGORIES.keys()),
-                        key="categories_filter_detection"
+                        default=st.session_state.detection_categories_filter,
+                        key="categories_filter_detection_widget"
                     )
+                    # Mettre à jour session_state
+                    st.session_state.detection_categories_filter = selected_categories
                 
                 filtered_detection_df = detection_df[
                     (detection_df['Échantillon'].isin(selected_samples)) &
@@ -2903,9 +3058,11 @@ def main():
             confidence_levels_radar = st.multiselect(
                 "Niveaux de confiance pour le radar des catégories",
                 options=[1, 2, 3, 4, 5],
-                default=[1, 2, 3, 4, 5],
-                key="conf_levels_radar"
+                default=st.session_state.detection_radar_conf_levels,
+                key="conf_levels_radar_widget"
             )
+            # Mettre à jour session_state
+            st.session_state.detection_radar_conf_levels = confidence_levels_radar
             
             plot_category_distribution_radar(features_df, samples_list, confidence_levels_radar)
     
@@ -3014,9 +3171,11 @@ def main():
                 selected_metrics = st.multiselect(
                     "Métriques pour le radar",
                     available_metrics,
-                    default=['Taux_identification_%', 'Niveau_1', 'Niveau_2'][:min(3, len(available_metrics))],
-                    key="metrics_radar_comparison"
+                    default=st.session_state.comparison_radar_metrics if st.session_state.comparison_radar_metrics else ['Taux_identification_%', 'Niveau_1', 'Niveau_2'][:min(3, len(available_metrics))],
+                    key="metrics_radar_comparison_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.comparison_radar_metrics = selected_metrics
                 
                 if len(selected_metrics) >= 3:
                     fig_radar = go.Figure()
@@ -3059,9 +3218,11 @@ def main():
                         confidence_levels_jaccard = st.multiselect(
                             "Filtrer par niveau de confiance",
                             options=[1, 2, 3, 4, 5],
-                            default=[1, 2, 3],
-                            key="conf_levels_jaccard"
+                            default=st.session_state.comparison_jaccard_conf,
+                            key="conf_levels_jaccard_widget"
                         )
+                        # Mettre à jour session_state
+                        st.session_state.comparison_jaccard_conf = confidence_levels_jaccard
                     else:
                         confidence_levels_jaccard = None
 
@@ -3069,9 +3230,11 @@ def main():
                     selected_samples_jaccard = st.multiselect(
                         "Sélectionner des échantillons spécifiques",
                         options=samples_list,
-                        default=samples_list,
-                        key="selected_samples_jaccard"
+                        default=st.session_state.comparison_jaccard_samples,
+                        key="selected_samples_jaccard_widget"
                     )
+                    # Mettre à jour session_state
+                    st.session_state.comparison_jaccard_samples = selected_samples_jaccard
 
                 plot_hierarchical_clustering(
                     features_df, 
@@ -3095,17 +3258,32 @@ def main():
             stat_section = st.selectbox(
                 "Choisir une analyse:",
                 ["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"],
-                key="stat_navigation"
+                index=["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"].index(st.session_state.stats_section),
+                key="stat_navigation_widget"
             )
+            # Mettre à jour session_state
+            st.session_state.stats_section = stat_section
             
             if stat_section == "📊 PCA & t-SNE":
                 st.subheader("📊 Analyse en Composantes Principales (PCA)")
                 
                 col1, col2 = st.columns([1, 1])
                 with col1:
-                    pca_3d = st.checkbox("Afficher PCA 3D", value=True, key="pca_3d_checkbox")
+                    pca_3d = st.checkbox(
+                        "Afficher PCA 3D", 
+                        value=st.session_state.stats_pca_3d, 
+                        key="pca_3d_checkbox_widget"
+                    )
+                    # Mettre à jour session_state
+                    st.session_state.stats_pca_3d = pca_3d
                 with col2:
-                    show_loadings = st.checkbox("Afficher les loadings", value=False, key="show_loadings_checkbox")
+                    show_loadings = st.checkbox(
+                        "Afficher les loadings", 
+                        value=st.session_state.stats_show_loadings, 
+                        key="show_loadings_checkbox_widget"
+                    )
+                    # Mettre à jour session_state
+                    st.session_state.stats_show_loadings = show_loadings
                 
                 if pca_3d:
                     plot_3d_pca(matrix_df)
@@ -3192,8 +3370,11 @@ def main():
                 transform_option = st.selectbox(
                     "Transformation des données",
                     ["Aucune", "Log10", "Z-score", "Min-Max"],
-                    key="heatmap_transform"
+                    index=["Aucune", "Log10", "Z-score", "Min-Max"].index(st.session_state.stats_heatmap_transform),
+                    key="heatmap_transform_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.stats_heatmap_transform = transform_option
                 
                 if transform_option == "Log10":
                     matrix_transformed = np.log10(matrix_df + 1)
@@ -3222,9 +3403,12 @@ def main():
                 max_features = min(100, len(matrix_df.columns))
                 n_features = st.slider(
                     "Nombre de features à afficher",
-                    10, max_features, min(50, max_features),
-                    key="heatmap_features"
+                    10, max_features, 
+                    min(st.session_state.stats_heatmap_features, max_features),
+                    key="heatmap_features_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.stats_heatmap_features = n_features
                 
                 feature_var = matrix_transformed.var(axis=0).nlargest(n_features)
                 selected_features = feature_var.index
@@ -3247,8 +3431,11 @@ def main():
                 distance_metric = st.selectbox(
                     "Métrique de distance",
                     ["Euclidienne", "Cosinus"],
-                    key="distance_metric"
+                    index=["Euclidienne", "Cosinus"].index(st.session_state.stats_distance_metric),
+                    key="distance_metric_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.stats_distance_metric = distance_metric
                 
                 from scipy.spatial.distance import pdist, squareform
                 
@@ -3401,25 +3588,42 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                export_identified_only = st.checkbox("Exporter uniquement les identifiées", value=True, key="export_identified_only")
-                export_aggregate = st.checkbox("Agréger par molécule (grouper adduits)", value=True, key="export_aggregate")
+                export_identified_only = st.checkbox(
+                    "Exporter uniquement les identifiées", 
+                    value=st.session_state.reports_identified_only, 
+                    key="export_identified_only_widget"
+                )
+                # Mettre à jour session_state
+                st.session_state.reports_identified_only = export_identified_only
+                
+                export_aggregate = st.checkbox(
+                    "Agréger par molécule (grouper adduits)", 
+                    value=st.session_state.reports_aggregate, 
+                    key="export_aggregate_widget"
+                )
+                # Mettre à jour session_state
+                st.session_state.reports_aggregate = export_aggregate
                 
                 if 'confidence_level' in features_df.columns:
                     export_conf_levels = st.multiselect(
                         "Niveaux de confiance à exporter",
                         options=[1, 2, 3, 4, 5],
-                        default=[1, 2, 3],
-                        key="export_conf_levels"
+                        default=st.session_state.reports_conf_levels,
+                        key="export_conf_levels_widget"
                     )
+                    # Mettre à jour session_state
+                    st.session_state.reports_conf_levels = export_conf_levels
                 
                 samples_list = list(set([s for samples in features_df['samples'].dropna() 
                                        for s in samples.split(',')]))
                 export_samples = st.multiselect(
                     "Échantillons à exporter",
                     options=samples_list,
-                    default=samples_list,
-                    key="export_samples"
+                    default=st.session_state.reports_samples,
+                    key="export_samples_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.reports_samples = export_samples
             
             with col2:
                 all_columns = features_df.columns.tolist()
@@ -3442,12 +3646,27 @@ def main():
                 export_columns = st.multiselect(
                     "Colonnes à exporter", 
                     options=all_columns + (['total_intensity', 'sample_specific_intensity'] if export_aggregate else []),
-                    default=[col for col in default_export_cols if col in all_columns + (['total_intensity', 'sample_specific_intensity'] if export_aggregate else [])],
-                    key="export_columns"
+                    default=st.session_state.reports_columns if st.session_state.reports_columns else [col for col in default_export_cols if col in all_columns + (['total_intensity', 'sample_specific_intensity'] if export_aggregate else [])],
+                    key="export_columns_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.reports_columns = export_columns
                 
-                include_stats = st.checkbox("Inclure les statistiques par échantillon", value=False, key="include_stats")
-                include_summary = st.checkbox("Inclure un résumé en en-tête", value=True, key="include_summary")
+                include_stats = st.checkbox(
+                    "Inclure les statistiques par échantillon", 
+                    value=st.session_state.reports_include_stats, 
+                    key="include_stats_widget"
+                )
+                # Mettre à jour session_state
+                st.session_state.reports_include_stats = include_stats
+                
+                include_summary = st.checkbox(
+                    "Inclure un résumé en en-tête", 
+                    value=st.session_state.reports_include_summary, 
+                    key="include_summary_widget"
+                )
+                # Mettre à jour session_state
+                st.session_state.reports_include_summary = include_summary
             
             # Préparer les données
             export_df = features_df.copy()
@@ -3564,7 +3783,6 @@ def main():
                         file_name=f"export_MS_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-            
             with col3:
                 if not export_df.empty:
                     json_data = export_df.to_json(orient='records', indent=2)
@@ -3620,8 +3838,11 @@ def main():
                 selected_level = st.selectbox(
                     "Sélectionner un niveau pour analyse",
                     available_levels,
-                    key="selected_level_analysis"
+                    index=available_levels.index(st.session_state.confidence_selected_level) if st.session_state.confidence_selected_level in available_levels else 0,
+                    key="selected_level_analysis_widget"
                 )
+                # Mettre à jour session_state
+                st.session_state.confidence_selected_level = selected_level
                 
                 level_data = features_df[features_df['confidence_level'] == selected_level]
                 
@@ -3700,3 +3921,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+        
