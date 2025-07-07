@@ -14,7 +14,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist, squareform, jaccard
 from scipy import stats
-from scipy.stats import normaltest, jarque_bera, shapiro
+from scipy.stats import normaltest, jarque_bera, shapiro, ttest_ind, mannwhitneyu
 import networkx as nx
 import ast
 import re
@@ -491,6 +491,8 @@ def init_filter_params():
     # Paramètres pour l'onglet statistics
     if 'stats_section' not in st.session_state:
         st.session_state.stats_section = "📊 PCA & t-SNE"
+    if 'stats_analysis_type' not in st.session_state:
+        st.session_state.stats_analysis_type = "Analyse par individus"
     if 'stats_pca_3d' not in st.session_state:
         st.session_state.stats_pca_3d = True
     if 'stats_show_loadings' not in st.session_state:
@@ -505,6 +507,14 @@ def init_filter_params():
         st.session_state.stats_heatmap_features = 50
     if 'stats_distance_metric' not in st.session_state:
         st.session_state.stats_distance_metric = "Euclidienne"
+    if 'volcano_group1' not in st.session_state:
+        st.session_state.volcano_group1 = []
+    if 'volcano_group2' not in st.session_state:
+        st.session_state.volcano_group2 = []
+    if 'volcano_pvalue_threshold' not in st.session_state:
+        st.session_state.volcano_pvalue_threshold = 0.05
+    if 'volcano_fc_threshold' not in st.session_state:
+        st.session_state.volcano_fc_threshold = 2.0
     
     # Paramètres pour l'onglet reports
     if 'reports_identified_only' not in st.session_state:
@@ -533,7 +543,7 @@ def generate_unique_key(base_key):
     timestamp = str(int(time.time() * 1000))[-6:]
     return f"{base_key}_{unique_id}_{timestamp}"
 
-@st.cache_data(ttl=3600, max_entries=3)  # Cache optimisé
+@st.cache_data(ttl=7200, max_entries=5, show_spinner=False)  # Cache optimisé
 def parse_list_column(series):
     """Convertit les colonnes de listes string en vraies listes"""
     def safe_eval(x):
@@ -553,7 +563,7 @@ def parse_list_column(series):
             return []
     return series.apply(safe_eval)
 
-@st.cache_data(ttl=3600, max_entries=3)  # Cache optimisé
+@st.cache_data(ttl=7200, max_entries=5, show_spinner=False)  # Cache optimisé
 def parse_dict_column(series):
     """Convertit les colonnes de dictionnaires string en vrais dictionnaires"""
     def safe_eval_dict(x):
@@ -569,7 +579,7 @@ def parse_dict_column(series):
             return {}
     return series.apply(safe_eval_dict)
 
-@st.cache_data(ttl=1800)  # Cache optimisé
+@st.cache_data(ttl=3600, show_spinner=False)  # Cache optimisé
 def get_intensity_for_sample(row, sample_name):
     """Extrait l'intensité spécifique pour un échantillon donné"""
     try:
@@ -599,7 +609,7 @@ def get_intensity_for_sample(row, sample_name):
         # En cas d'erreur, retourner l'intensité générale
         return row.get('intensity', 0)
 
-@st.cache_data(ttl=1800)  # Cache optimisé
+@st.cache_data(ttl=3600, show_spinner=False)  # Cache optimisé
 def count_unique_molecules(df, sample_filter=None, confidence_levels=None):
     """Compte les molécules uniques (pas les occurrences)"""
     filtered_df = df[df['match_name'].notna()].copy()
@@ -612,7 +622,7 @@ def count_unique_molecules(df, sample_filter=None, confidence_levels=None):
     
     return len(filtered_df['match_name'].unique())
 
-@st.cache_data(ttl=1800)  # Cache optimisé
+@st.cache_data(ttl=3600, show_spinner=False)  # Cache optimisé
 def aggregate_molecules_by_name_enhanced(df, sample_filter=None):
     """Agrège les données par nom de molécule en conservant toutes les informations importantes et utilise les intensités par échantillon"""
     filtered_df = df[df['match_name'].notna()].copy()
@@ -684,7 +694,7 @@ def aggregate_molecules_by_name_enhanced(df, sample_filter=None):
     
     return pd.DataFrame(aggregated_data)
 
-@st.cache_data(ttl=1800)  # Cache optimisé
+@st.cache_data(ttl=3600, show_spinner=False)  # Cache optimisé
 def aggregate_molecules_by_name(df, sample_filter=None):
     """Version standard pour la compatibilité"""
     return aggregate_molecules_by_name_enhanced(df, sample_filter)
@@ -714,7 +724,7 @@ def display_pubchem_link(molecule_name, smiles=None):
     """, unsafe_allow_html=True)
 
 # Fonctions de chargement des données avec cache optimisé
-@st.cache_data(ttl=7200, show_spinner="Chargement des données features...")  # Cache optimisé
+@st.cache_data(ttl=14400, show_spinner="Chargement des données features...")  # Cache optimisé
 def load_features_data(uploaded_file):
     """Charge et traite le fichier features_complete.csv."""
     df = pd.read_csv(uploaded_file)
@@ -734,13 +744,13 @@ def load_features_data(uploaded_file):
     
     return df
 
-@st.cache_data(ttl=7200, show_spinner="Chargement de la matrice...")  # Cache optimisé
+@st.cache_data(ttl=14400, show_spinner="Chargement de la matrice...")  # Cache optimisé
 def load_matrix_data(uploaded_file):
     """Charge le fichier feature_matrix.csv."""
     df = pd.read_csv(uploaded_file, index_col=0)
     return df
 
-@st.cache_data(ttl=3600)  # Cache optimisé
+@st.cache_data(ttl=7200, show_spinner=False)  # Cache optimisé
 def calculate_detection_factor(df, samples_list, confidence_levels=None):
     """Calcule le facteur de détection par catégorie pour chaque échantillon avec filtrage par niveau de confiance - MOLÉCULES UNIQUES"""
     detection_factors = {}
@@ -1614,8 +1624,8 @@ def safe_pca_analysis(matrix_df, n_components=3):
     
     return pca, X_pca, X_scaled
 
-def plot_3d_pca(matrix_df):
-    """PCA en 3D avec gestion d'erreur"""
+def plot_3d_pca(matrix_df, analysis_type="Analyse par individus"):
+    """PCA en 3D avec gestion d'erreur et type d'analyse"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
@@ -1625,6 +1635,10 @@ def plot_3d_pca(matrix_df):
     if pca is None:
         return
     
+    title_suffix = ""
+    if analysis_type == "Analyse par marqueurs":
+        title_suffix = " - Focus sur les marqueurs"
+    
     if X_pca.shape[1] < 3:
         st.warning(f"PCA 3D impossible : seulement {X_pca.shape[1]} composante(s) disponible(s)")
         # Afficher PCA 2D à la place
@@ -1633,7 +1647,7 @@ def plot_3d_pca(matrix_df):
                 x=X_pca[:, 0],
                 y=X_pca[:, 1],
                 text=matrix_df.index,
-                title=f"PCA 2D (PC1: {pca.explained_variance_ratio_[0]*100:.1f}%, "
+                title=f"PCA 2D{title_suffix} (PC1: {pca.explained_variance_ratio_[0]*100:.1f}%, "
                       f"PC2: {pca.explained_variance_ratio_[1]*100:.1f}%)",
                 labels={
                     'x': f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)',
@@ -1652,7 +1666,7 @@ def plot_3d_pca(matrix_df):
         y=X_pca[:, 1],
         z=X_pca[:, 2],
         text=matrix_df.index,
-        title=f"PCA 3D (PC1: {pca.explained_variance_ratio_[0]*100:.1f}%, "
+        title=f"PCA 3D{title_suffix} (PC1: {pca.explained_variance_ratio_[0]*100:.1f}%, "
               f"PC2: {pca.explained_variance_ratio_[1]*100:.1f}%, "
               f"PC3: {pca.explained_variance_ratio_[2]*100:.1f}%)",
         labels={
@@ -1667,7 +1681,7 @@ def plot_3d_pca(matrix_df):
     fig.update_layout(height=700)
     st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("pca_3d_plot"))
 
-def plot_tsne_analysis(matrix_df):
+def plot_tsne_analysis(matrix_df, analysis_type="Analyse par individus"):
     """Analyse t-SNE avec gestion d'erreur et PERSISTANCE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
@@ -1707,11 +1721,15 @@ def plot_tsne_analysis(matrix_df):
         tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, max_iter=1000)
         X_tsne = tsne.fit_transform(X_scaled)
         
+        title_suffix = ""
+        if analysis_type == "Analyse par marqueurs":
+            title_suffix = " - Focus sur les marqueurs"
+        
         fig = px.scatter(
             x=X_tsne[:, 0],
             y=X_tsne[:, 1],
             text=matrix_df.index,
-            title=f"Analyse t-SNE (perplexité={perplexity})",
+            title=f"Analyse t-SNE{title_suffix} (perplexité={perplexity})",
             labels={'x': 't-SNE 1', 'y': 't-SNE 2'},
             color_discrete_sequence=DISTINCT_COLORS
         )
@@ -1723,7 +1741,7 @@ def plot_tsne_analysis(matrix_df):
     except Exception as e:
         st.error(f"Erreur t-SNE : {str(e)}")
 
-def perform_pca_analysis(matrix_df):
+def perform_pca_analysis(matrix_df, analysis_type="Analyse par individus"):
     """Effectue une analyse PCA sécurisée sur la matrice des features"""
     if matrix_df is None or matrix_df.empty:
         st.error("Aucune matrice de features chargée")
@@ -1756,8 +1774,13 @@ def perform_pca_analysis(matrix_df):
             name='Variance cumulée',
             line=dict(color=DISTINCT_COLORS[1], width=3)
         ))
+        
+        title_suffix = ""
+        if analysis_type == "Analyse par marqueurs":
+            title_suffix = " - Focus sur les marqueurs"
+        
         fig1.update_layout(
-            title="Variance expliquée par les composantes principales",
+            title=f"Variance expliquée par les composantes principales{title_suffix}",
             xaxis_title="Composante principale",
             yaxis_title="Variance expliquée (%)"
         )
@@ -1770,7 +1793,7 @@ def perform_pca_analysis(matrix_df):
                 x=X_pca[:, 0],
                 y=X_pca[:, 1],
                 text=matrix_df.index,
-                title=f"Score plot PCA (PC1: {variance_ratio[0]*100:.1f}%, PC2: {variance_ratio[1]*100:.1f}%)",
+                title=f"Score plot PCA{title_suffix} (PC1: {variance_ratio[0]*100:.1f}%, PC2: {variance_ratio[1]*100:.1f}%)",
                 labels={'x': f'PC1 ({variance_ratio[0]*100:.1f}%)', 'y': f'PC2 ({variance_ratio[1]*100:.1f}%)'},
                 color_discrete_sequence=DISTINCT_COLORS
             )
@@ -1788,20 +1811,26 @@ def perform_pca_analysis(matrix_df):
 
 # NOUVELLES FONCTIONS POUR LES ANALYSES STATISTIQUES AVANCÉES
 
-def plot_correlation_heatmap(matrix_df):
-    """Heatmap de corrélation entre échantillons"""
+def plot_correlation_heatmap(matrix_df, analysis_type="Analyse par individus"):
+    """Heatmap de corrélation entre échantillons ou marqueurs"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
         return
     
-    # Calculer la matrice de corrélation
-    corr_matrix = matrix_df.T.corr()  # Transpose pour avoir échantillons vs échantillons
+    if analysis_type == "Analyse par marqueurs":
+        # Transposer pour analyser les corrélations entre marqueurs (features)
+        corr_matrix = matrix_df.corr()
+        title = "Matrice de corrélation entre marqueurs (features)"
+    else:
+        # Calculer la matrice de corrélation entre échantillons
+        corr_matrix = matrix_df.T.corr()
+        title = "Matrice de corrélation entre échantillons"
     
     fig = px.imshow(
         corr_matrix,
         text_auto=".2f",
         aspect="auto",
-        title="Matrice de corrélation entre échantillons",
+        title=title,
         color_continuous_scale='RdBu_r',
         range_color=[-1, 1]
     )
@@ -1811,7 +1840,7 @@ def plot_correlation_heatmap(matrix_df):
     
     return corr_matrix
 
-def perform_kmeans_clustering(matrix_df):
+def perform_kmeans_clustering(matrix_df, analysis_type="Analyse par individus"):
     """Clustering K-means sur la matrice des features avec validation du nombre de clusters et PERSISTANCE"""
     if matrix_df is None or matrix_df.empty:
         st.warning("Aucune matrice chargée")
@@ -1862,13 +1891,17 @@ def perform_kmeans_clustering(matrix_df):
         pca = PCA(n_components=2)
         X_pca = pca.fit_transform(X_scaled)
         
+        title_suffix = ""
+        if analysis_type == "Analyse par marqueurs":
+            title_suffix = " - Focus sur les marqueurs"
+        
         # Graphique
         fig = px.scatter(
             x=X_pca[:, 0],
             y=X_pca[:, 1],
             color=cluster_labels,
             text=matrix_df.index,
-            title=f"Clustering K-means (k={n_clusters})",
+            title=f"Clustering K-means{title_suffix} (k={n_clusters})",
             labels={'x': f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)', 
                     'y': f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)'},
             color_discrete_sequence=DISTINCT_COLORS
@@ -2041,6 +2074,311 @@ def plot_sample_boxplot_by_category(df, sample_name):
     with col3:
         avg_intensity = filtered_df['Intensité'].mean()
         st.metric("Intensité moyenne", f"{avg_intensity:.2e}")
+
+# NOUVELLES FONCTIONS POUR LE VOLCANO PLOT ET LES ANALYSES DE MARQUEURS
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def prepare_volcano_data(matrix_df, group1_samples, group2_samples):
+    """Prépare les données pour le volcano plot"""
+    if not group1_samples or not group2_samples:
+        return None
+    
+    # Filtrer les échantillons des deux groupes
+    group1_data = matrix_df.loc[group1_samples]
+    group2_data = matrix_df.loc[group2_samples]
+    
+    results = []
+    
+    for feature in matrix_df.columns:
+        # Valeurs pour chaque groupe
+        values1 = group1_data[feature].values
+        values2 = group2_data[feature].values
+        
+        # Calculer les moyennes
+        mean1 = np.mean(values1)
+        mean2 = np.mean(values2)
+        
+        # Éviter les divisions par zéro
+        if mean2 == 0:
+            fold_change = np.inf if mean1 > 0 else 1
+        else:
+            fold_change = mean1 / mean2
+        
+        # Test statistique (t-test ou Mann-Whitney selon la distribution)
+        try:
+            if len(values1) >= 3 and len(values2) >= 3:
+                # Test de normalité
+                _, p_norm1 = shapiro(values1) if len(values1) <= 5000 else normaltest(values1)
+                _, p_norm2 = shapiro(values2) if len(values2) <= 5000 else normaltest(values2)
+                
+                if p_norm1 > 0.05 and p_norm2 > 0.05:
+                    # Données normales : t-test
+                    stat, p_value = ttest_ind(values1, values2)
+                else:
+                    # Données non-normales : Mann-Whitney U
+                    stat, p_value = mannwhitneyu(values1, values2, alternative='two-sided')
+            else:
+                # Pas assez d'échantillons pour un test statistique
+                p_value = 1.0
+                
+        except:
+            p_value = 1.0
+        
+        results.append({
+            'Feature': feature,
+            'Group1_mean': mean1,
+            'Group2_mean': mean2,
+            'Fold_change': fold_change,
+            'Log2_fold_change': np.log2(fold_change) if fold_change > 0 and fold_change != np.inf else 0,
+            'P_value': p_value,
+            'Neg_log10_p': -np.log10(p_value) if p_value > 0 else 0
+        })
+    
+    return pd.DataFrame(results)
+
+def plot_volcano_plot(matrix_df):
+    """Crée un volcano plot pour comparer deux groupes d'individus"""
+    st.subheader("🌋 Volcano Plot - Comparaison entre groupes")
+    
+    if matrix_df is None or matrix_df.empty:
+        st.warning("Aucune matrice chargée")
+        return
+    
+    samples_list = list(matrix_df.index)
+    
+    # Interface pour sélectionner les groupes
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Groupe 1")
+        group1_samples = st.multiselect(
+            "Sélectionner les échantillons du groupe 1",
+            options=samples_list,
+            default=st.session_state.volcano_group1,
+            key="volcano_group1_widget"
+        )
+        st.session_state.volcano_group1 = group1_samples
+        
+        if group1_samples:
+            st.info(f"Groupe 1: {len(group1_samples)} échantillons")
+    
+    with col2:
+        st.subheader("Groupe 2")
+        # Exclure les échantillons déjà sélectionnés dans le groupe 1
+        available_group2 = [s for s in samples_list if s not in group1_samples]
+        group2_samples = st.multiselect(
+            "Sélectionner les échantillons du groupe 2",
+            options=available_group2,
+            default=[s for s in st.session_state.volcano_group2 if s in available_group2],
+            key="volcano_group2_widget"
+        )
+        st.session_state.volcano_group2 = group2_samples
+        
+        if group2_samples:
+            st.info(f"Groupe 2: {len(group2_samples)} échantillons")
+    
+    if not group1_samples or not group2_samples:
+        st.warning("Veuillez sélectionner des échantillons pour les deux groupes")
+        return
+    
+    # Paramètres de seuillage
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        p_threshold = st.number_input(
+            "Seuil p-value",
+            min_value=0.001,
+            max_value=0.1,
+            value=st.session_state.volcano_pvalue_threshold,
+            step=0.005,
+            format="%.3f",
+            key="volcano_pvalue_widget"
+        )
+        st.session_state.volcano_pvalue_threshold = p_threshold
+    
+    with col2:
+        fc_threshold = st.number_input(
+            "Seuil fold-change",
+            min_value=1.1,
+            max_value=10.0,
+            value=st.session_state.volcano_fc_threshold,
+            step=0.1,
+            format="%.1f",
+            key="volcano_fc_widget"
+        )
+        st.session_state.volcano_fc_threshold = fc_threshold
+    
+    # Calculer les données du volcano plot
+    with st.spinner("Calcul des statistiques..."):
+        volcano_data = prepare_volcano_data(matrix_df, group1_samples, group2_samples)
+    
+    if volcano_data is None or volcano_data.empty:
+        st.error("Erreur dans le calcul des données volcano")
+        return
+    
+    # Classifier les points
+    volcano_data['Significance'] = 'Non significatif'
+    volcano_data.loc[
+        (volcano_data['P_value'] < p_threshold) & 
+        (volcano_data['Fold_change'] > fc_threshold), 
+        'Significance'
+    ] = f'↑ Groupe 1 (FC>{fc_threshold}, p<{p_threshold})'
+    
+    volcano_data.loc[
+        (volcano_data['P_value'] < p_threshold) & 
+        (volcano_data['Fold_change'] < 1/fc_threshold), 
+        'Significance'
+    ] = f'↓ Groupe 2 (FC<{1/fc_threshold:.1f}, p<{p_threshold})'
+    
+    # Créer le volcano plot
+    fig = px.scatter(
+        volcano_data,
+        x='Log2_fold_change',
+        y='Neg_log10_p',
+        color='Significance',
+        hover_data=['Feature', 'P_value', 'Fold_change', 'Group1_mean', 'Group2_mean'],
+        title=f"Volcano Plot: {', '.join(group1_samples)} vs {', '.join(group2_samples)}",
+        labels={
+            'Log2_fold_change': 'Log2(Fold Change)',
+            'Neg_log10_p': '-Log10(p-value)'
+        },
+        color_discrete_map={
+            'Non significatif': '#CCCCCC',
+            f'↑ Groupe 1 (FC>{fc_threshold}, p<{p_threshold})': '#FF6B6B',
+            f'↓ Groupe 2 (FC<{1/fc_threshold:.1f}, p<{p_threshold})': '#4ECDC4'
+        }
+    )
+    
+    # Ajouter les lignes de seuil
+    fig.add_hline(y=-np.log10(p_threshold), line_dash="dash", line_color="black",
+                  annotation_text=f"p = {p_threshold}")
+    fig.add_vline(x=np.log2(fc_threshold), line_dash="dash", line_color="black",
+                  annotation_text=f"FC = {fc_threshold}")
+    fig.add_vline(x=-np.log2(fc_threshold), line_dash="dash", line_color="black",
+                  annotation_text=f"FC = {1/fc_threshold:.1f}")
+    
+    fig.update_layout(height=600)
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("volcano_plot"))
+    
+    # Statistiques du volcano plot
+    n_up = len(volcano_data[volcano_data['Significance'].str.contains('↑')])
+    n_down = len(volcano_data[volcano_data['Significance'].str.contains('↓')])
+    n_total = len(volcano_data)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total features", n_total)
+    
+    with col2:
+        st.metric("↑ Groupe 1", n_up)
+    
+    with col3:
+        st.metric("↓ Groupe 2", n_down)
+    
+    with col4:
+        st.metric("% significatifs", f"{(n_up + n_down)/n_total*100:.1f}%")
+    
+    # Tableau des marqueurs significatifs
+    st.subheader("Marqueurs significatifs")
+    
+    significant_markers = volcano_data[
+        volcano_data['Significance'] != 'Non significatif'
+    ].sort_values('P_value')
+    
+    if not significant_markers.empty:
+        display_cols = ['Feature', 'Log2_fold_change', 'P_value', 'Fold_change', 
+                       'Group1_mean', 'Group2_mean', 'Significance']
+        st.dataframe(
+            significant_markers[display_cols].round(4),
+            use_container_width=True
+        )
+        
+        # Export des marqueurs significatifs
+        csv_markers = significant_markers.to_csv(index=False)
+        st.download_button(
+            label="📥 Télécharger les marqueurs significatifs",
+            data=csv_markers,
+            file_name=f"marqueurs_significatifs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Aucun marqueur significatif trouvé avec les seuils actuels")
+
+def plot_markers_pca(matrix_df, significant_markers_df=None):
+    """PCA focalisée sur les marqueurs significatifs"""
+    st.subheader("🎯 PCA des marqueurs significatifs")
+    
+    if matrix_df is None or matrix_df.empty:
+        st.warning("Aucune matrice chargée")
+        return
+    
+    if significant_markers_df is None or significant_markers_df.empty:
+        st.info("Aucun marqueur significatif sélectionné. Utilisation de tous les features.")
+        selected_features = matrix_df.columns.tolist()
+    else:
+        selected_features = significant_markers_df['Feature'].tolist()
+        selected_features = [f for f in selected_features if f in matrix_df.columns]
+    
+    if not selected_features:
+        st.warning("Aucun marqueur valide trouvé")
+        return
+    
+    # Filtrer la matrice sur les marqueurs sélectionnés
+    markers_matrix = matrix_df[selected_features]
+    
+    st.info(f"Analyse PCA sur {len(selected_features)} marqueurs")
+    
+    # Effectuer l'analyse PCA
+    perform_pca_analysis(markers_matrix, "Analyse par marqueurs")
+
+def plot_markers_heatmap(matrix_df, significant_markers_df=None):
+    """Heatmap des marqueurs significatifs"""
+    st.subheader("🔥 Heatmap des marqueurs significatifs")
+    
+    if matrix_df is None or matrix_df.empty:
+        st.warning("Aucune matrice chargée")
+        return
+    
+    if significant_markers_df is None or significant_markers_df.empty:
+        st.info("Aucun marqueur significatif sélectionné. Utilisation des top features par variance.")
+        # Utiliser les features avec la plus grande variance
+        feature_var = matrix_df.var(axis=0).nlargest(50)
+        selected_features = feature_var.index.tolist()
+    else:
+        selected_features = significant_markers_df['Feature'].tolist()
+        selected_features = [f for f in selected_features if f in matrix_df.columns]
+    
+    if not selected_features:
+        st.warning("Aucun marqueur valide trouvé")
+        return
+    
+    # Limiter le nombre de features pour la lisibilité
+    max_features = st.slider("Nombre maximum de marqueurs à afficher", 10, 100, 30)
+    selected_features = selected_features[:max_features]
+    
+    # Filtrer la matrice
+    markers_matrix = matrix_df[selected_features]
+    
+    # Normalisation
+    scaler = StandardScaler()
+    markers_scaled = pd.DataFrame(
+        scaler.fit_transform(markers_matrix),
+        index=markers_matrix.index,
+        columns=markers_matrix.columns
+    )
+    
+    # Créer la heatmap
+    fig = px.imshow(
+        markers_scaled.T,  # Transposer pour avoir les marqueurs en lignes
+        labels=dict(x="Échantillons", y="Marqueurs", color="Intensité normalisée"),
+        title=f"Heatmap des {len(selected_features)} marqueurs les plus significatifs",
+        aspect="auto",
+        color_continuous_scale='RdBu_r'
+    )
+    
+    fig.update_layout(height=max(400, len(selected_features) * 15))
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("markers_heatmap"))
 
 def show_confidence_levels_table():
     """Affiche le tableau des niveaux de confiance avec un style amélioré"""
@@ -3247,230 +3585,278 @@ def main():
                 st.warning("Au moins 2 échantillons sont nécessaires pour la comparaison")
     
     elif st.session_state.active_tab == "statistics":
-        if matrix_df is not None:
-            st.markdown("""
-            <div class="section-header">
-                <h2>📈 Analyses statistiques avancées</h2>
-                <p>Explorez vos données avec des méthodes statistiques avancées</p>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="section-header">
+            <h2>📈 Analyses statistiques avancées</h2>
+            <p>Explorez vos données avec des méthodes statistiques avancées</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # NOUVEAU : Sélecteur du type d'analyse
+        analysis_type = st.selectbox(
+            "Type d'analyse",
+            ["Analyse par individus", "Analyse par marqueurs"],
+            index=["Analyse par individus", "Analyse par marqueurs"].index(st.session_state.stats_analysis_type),
+            help="Choisissez entre l'analyse des individus ou l'analyse focalisée sur les marqueurs",
+            key="analysis_type_widget"
+        )
+        # Mettre à jour session_state
+        st.session_state.stats_analysis_type = analysis_type
+        
+        if analysis_type == "Analyse par marqueurs":
+            st.info("🎯 Mode marqueurs : Analyses focalisées sur les features discriminants")
             
-            stat_section = st.selectbox(
-                "Choisir une analyse:",
-                ["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"],
-                index=["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"].index(st.session_state.stats_section),
-                key="stat_navigation_widget"
-            )
-            # Mettre à jour session_state
-            st.session_state.stats_section = stat_section
-            
-            if stat_section == "📊 PCA & t-SNE":
-                st.subheader("📊 Analyse en Composantes Principales (PCA)")
+            if matrix_df is not None:
+                # Section Volcano Plot
+                st.subheader("🌋 Volcano Plot")
+                plot_volcano_plot(matrix_df)
                 
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    pca_3d = st.checkbox(
-                        "Afficher PCA 3D", 
-                        value=st.session_state.stats_pca_3d, 
-                        key="pca_3d_checkbox_widget"
+                # PCA des marqueurs significatifs
+                st.subheader("📊 PCA des marqueurs")
+                plot_markers_pca(matrix_df)
+                
+                # Heatmap des marqueurs
+                st.subheader("🔥 Heatmap des marqueurs")
+                plot_markers_heatmap(matrix_df)
+                
+            else:
+                st.warning("""
+                ⚠️ Veuillez charger le fichier **feature_matrix.csv** pour accéder aux analyses par marqueurs.
+                
+                Ce fichier doit contenir une matrice avec :
+                - Lignes : échantillons
+                - Colonnes : features (format : F0001_mz102.9880)
+                - Valeurs : intensités
+                """)
+        
+        else:  # Analyse par individus
+            if matrix_df is not None:
+                stat_section = st.selectbox(
+                    "Choisir une analyse:",
+                    ["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"],
+                    index=["📊 PCA & t-SNE", "🔍 Clustering", "📈 Corrélations", "🎨 Heatmaps"].index(st.session_state.stats_section),
+                    key="stat_navigation_widget"
+                )
+                # Mettre à jour session_state
+                st.session_state.stats_section = stat_section
+                
+                if stat_section == "📊 PCA & t-SNE":
+                    st.subheader("📊 Analyse en Composantes Principales (PCA)")
+                    
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        pca_3d = st.checkbox(
+                            "Afficher PCA 3D", 
+                            value=st.session_state.stats_pca_3d, 
+                            key="pca_3d_checkbox_widget"
+                        )
+                        # Mettre à jour session_state
+                        st.session_state.stats_pca_3d = pca_3d
+                    with col2:
+                        show_loadings = st.checkbox(
+                            "Afficher les loadings", 
+                            value=st.session_state.stats_show_loadings, 
+                            key="show_loadings_checkbox_widget"
+                        )
+                        # Mettre à jour session_state
+                        st.session_state.stats_show_loadings = show_loadings
+                    
+                    if pca_3d:
+                        plot_3d_pca(matrix_df, analysis_type)
+                    else:
+                        perform_pca_analysis(matrix_df, analysis_type)
+                    
+                    if show_loadings:
+                        st.subheader("Contribution des features aux composantes principales")
+                        
+                        pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], matrix_df.shape[0]))
+                        
+                        if pca is not None:
+                            n_components = min(3, pca.n_components_)
+                            loadings_df = pd.DataFrame(
+                                pca.components_[:n_components].T,
+                                columns=[f'PC{i+1}' for i in range(n_components)],
+                                index=matrix_df.columns
+                            )
+                            
+                            for i in range(n_components):
+                                pc = f'PC{i+1}'
+                                st.write(f"**Top 10 contributeurs à {pc}:**")
+                                top_features = loadings_df[pc].abs().nlargest(10)
+                                st.dataframe(top_features.round(3))
+                    
+                    st.markdown("---")
+                    
+                    st.subheader("🌐 Analyse t-SNE")
+                    plot_tsne_analysis(matrix_df, analysis_type)
+                
+                elif stat_section == "🔍 Clustering":
+                    st.subheader("🔍 Analyses de clustering")
+                    
+                    st.subheader("K-means Clustering")
+                    perform_kmeans_clustering(matrix_df, analysis_type)
+                    
+                    st.markdown("---")
+                    
+                    st.subheader("Clustering hiérarchique")
+                    st.info("Cette analyse utilise les molécules identifiées du fichier features")
+                    if features_df is not None:
+                        samples_list = list(set([s for samples in features_df['samples'].dropna() 
+                                               for s in samples.split(',')]))
+                        plot_hierarchical_clustering(features_df, samples_list)
+                
+                elif stat_section == "📈 Corrélations":
+                    st.subheader("📈 Analyses de corrélation")
+                    
+                    corr_matrix = plot_correlation_heatmap(matrix_df, analysis_type)
+                    
+                    if corr_matrix is not None:
+                        st.subheader("Statistiques de corrélation")
+                        
+                        if analysis_type == "Analyse par marqueurs":
+                            # Pour les marqueurs, analyser toutes les corrélations
+                            corr_values = []
+                            for i in range(len(corr_matrix)):
+                                for j in range(i+1, len(corr_matrix)):
+                                    corr_values.append(corr_matrix.iloc[i, j])
+                            title_suffix = " entre marqueurs"
+                        else:
+                            # Pour les individus
+                            corr_values = []
+                            for i in range(len(corr_matrix)):
+                                for j in range(i+1, len(corr_matrix)):
+                                    corr_values.append(corr_matrix.iloc[i, j])
+                            title_suffix = " entre échantillons"
+                        
+                        if corr_values:
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("Corrélation moyenne", f"{np.mean(corr_values):.3f}")
+                            with col2:
+                                st.metric("Corrélation médiane", f"{np.median(corr_values):.3f}")
+                            with col3:
+                                st.metric("Corrélation max", f"{max(corr_values):.3f}")
+                            with col4:
+                                st.metric("Corrélation min", f"{min(corr_values):.3f}")
+                            
+                            fig_corr_dist = px.histogram(
+                                x=corr_values,
+                                nbins=30,
+                                title=f"Distribution des corrélations{title_suffix}",
+                                labels={'x': 'Coefficient de corrélation', 'y': 'Fréquence'},
+                                color_discrete_sequence=DISTINCT_COLORS
+                            )
+                            st.plotly_chart(fig_corr_dist, use_container_width=True, key=generate_unique_key("correlation_distribution"))
+                
+                elif stat_section == "🎨 Heatmaps":
+                    st.subheader("🎨 Heatmaps avancées")
+                    
+                    st.subheader("🔥 Heatmap des intensités")
+                    
+                    transform_option = st.selectbox(
+                        "Transformation des données",
+                        ["Aucune", "Log10", "Z-score", "Min-Max"],
+                        index=["Aucune", "Log10", "Z-score", "Min-Max"].index(st.session_state.stats_heatmap_transform),
+                        key="heatmap_transform_widget"
                     )
                     # Mettre à jour session_state
-                    st.session_state.stats_pca_3d = pca_3d
-                with col2:
-                    show_loadings = st.checkbox(
-                        "Afficher les loadings", 
-                        value=st.session_state.stats_show_loadings, 
-                        key="show_loadings_checkbox_widget"
+                    st.session_state.stats_heatmap_transform = transform_option
+                    
+                    if transform_option == "Log10":
+                        matrix_transformed = np.log10(matrix_df + 1)
+                        title_suffix = "(échelle log)"
+                    elif transform_option == "Z-score":
+                        scaler = StandardScaler()
+                        matrix_transformed = pd.DataFrame(
+                            scaler.fit_transform(matrix_df.T).T,
+                            index=matrix_df.index,
+                            columns=matrix_df.columns
+                        )
+                        title_suffix = "(Z-score)"
+                    elif transform_option == "Min-Max":
+                        from sklearn.preprocessing import MinMaxScaler
+                        scaler = MinMaxScaler()
+                        matrix_transformed = pd.DataFrame(
+                            scaler.fit_transform(matrix_df.T).T,
+                            index=matrix_df.index,
+                            columns=matrix_df.columns
+                        )
+                        title_suffix = "(Min-Max normalisé)"
+                    else:
+                        matrix_transformed = matrix_df
+                        title_suffix = ""
+                    
+                    max_features = min(100, len(matrix_df.columns))
+                    n_features = st.slider(
+                        "Nombre de features à afficher",
+                        10, max_features, 
+                        min(st.session_state.stats_heatmap_features, max_features),
+                        key="heatmap_features_widget"
                     )
                     # Mettre à jour session_state
-                    st.session_state.stats_show_loadings = show_loadings
-                
-                if pca_3d:
-                    plot_3d_pca(matrix_df)
-                else:
-                    perform_pca_analysis(matrix_df)
-                
-                if show_loadings:
-                    st.subheader("Contribution des features aux composantes principales")
+                    st.session_state.stats_heatmap_features = n_features
                     
-                    pca, X_pca, X_scaled = safe_pca_analysis(matrix_df, n_components=min(10, matrix_df.shape[1], matrix_df.shape[0]))
+                    feature_var = matrix_transformed.var(axis=0).nlargest(n_features)
+                    selected_features = feature_var.index
                     
-                    if pca is not None:
-                        n_components = min(3, pca.n_components_)
-                        loadings_df = pd.DataFrame(
-                            pca.components_[:n_components].T,
-                            columns=[f'PC{i+1}' for i in range(n_components)],
-                            index=matrix_df.columns
-                        )
-                        
-                        for i in range(n_components):
-                            pc = f'PC{i+1}'
-                            st.write(f"**Top 10 contributeurs à {pc}:**")
-                            top_features = loadings_df[pc].abs().nlargest(10)
-                            st.dataframe(top_features.round(3))
-                
-                st.markdown("---")
-                
-                st.subheader("🌐 Analyse t-SNE")
-                plot_tsne_analysis(matrix_df)
-            
-            elif stat_section == "🔍 Clustering":
-                st.subheader("🔍 Analyses de clustering")
-                
-                st.subheader("K-means Clustering")
-                perform_kmeans_clustering(matrix_df)
-                
-                st.markdown("---")
-                
-                st.subheader("Clustering hiérarchique")
-                st.info("Cette analyse utilise les molécules identifiées du fichier features")
-                if features_df is not None:
-                    samples_list = list(set([s for samples in features_df['samples'].dropna() 
-                                           for s in samples.split(',')]))
-                    plot_hierarchical_clustering(features_df, samples_list)
-            
-            elif stat_section == "📈 Corrélations":
-                st.subheader("📈 Analyses de corrélation")
-                
-                corr_matrix = plot_correlation_heatmap(matrix_df)
-                
-                if corr_matrix is not None:
-                    st.subheader("Statistiques de corrélation")
+                    matrix_subset = matrix_transformed[selected_features]
                     
-                    corr_values = []
-                    for i in range(len(corr_matrix)):
-                        for j in range(i+1, len(corr_matrix)):
-                            corr_values.append(corr_matrix.iloc[i, j])
-                    
-                    if corr_values:
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("Corrélation moyenne", f"{np.mean(corr_values):.3f}")
-                        with col2:
-                            st.metric("Corrélation médiane", f"{np.median(corr_values):.3f}")
-                        with col3:
-                            st.metric("Corrélation max", f"{max(corr_values):.3f}")
-                        with col4:
-                            st.metric("Corrélation min", f"{min(corr_values):.3f}")
-                        
-                        fig_corr_dist = px.histogram(
-                            x=corr_values,
-                            nbins=30,
-                            title="Distribution des corrélations entre échantillons",
-                            labels={'x': 'Coefficient de corrélation', 'y': 'Fréquence'},
-                            color_discrete_sequence=DISTINCT_COLORS
-                        )
-                        st.plotly_chart(fig_corr_dist, use_container_width=True, key=generate_unique_key("correlation_distribution"))
-            
-            elif stat_section == "🎨 Heatmaps":
-                st.subheader("🎨 Heatmaps avancées")
-                
-                st.subheader("🔥 Heatmap des intensités")
-                
-                transform_option = st.selectbox(
-                    "Transformation des données",
-                    ["Aucune", "Log10", "Z-score", "Min-Max"],
-                    index=["Aucune", "Log10", "Z-score", "Min-Max"].index(st.session_state.stats_heatmap_transform),
-                    key="heatmap_transform_widget"
-                )
-                # Mettre à jour session_state
-                st.session_state.stats_heatmap_transform = transform_option
-                
-                if transform_option == "Log10":
-                    matrix_transformed = np.log10(matrix_df + 1)
-                    title_suffix = "(échelle log)"
-                elif transform_option == "Z-score":
-                    scaler = StandardScaler()
-                    matrix_transformed = pd.DataFrame(
-                        scaler.fit_transform(matrix_df.T).T,
-                        index=matrix_df.index,
-                        columns=matrix_df.columns
+                    fig = px.imshow(
+                        matrix_subset,
+                        labels=dict(x="Features", y="Échantillons", color=f"Intensité {title_suffix}"),
+                        title=f"Heatmap des intensités {title_suffix}",
+                        aspect="auto",
+                        color_continuous_scale='Viridis'
                     )
-                    title_suffix = "(Z-score)"
-                elif transform_option == "Min-Max":
-                    from sklearn.preprocessing import MinMaxScaler
-                    scaler = MinMaxScaler()
-                    matrix_transformed = pd.DataFrame(
-                        scaler.fit_transform(matrix_df.T).T,
-                        index=matrix_df.index,
-                        columns=matrix_df.columns
+                    
+                    fig.update_layout(height=600)
+                    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("advanced_heatmap"))
+                    
+                    st.subheader("📏 Heatmap des distances entre échantillons")
+                    
+                    distance_metric = st.selectbox(
+                        "Métrique de distance",
+                        ["Euclidienne", "Cosinus"],
+                        index=["Euclidienne", "Cosinus"].index(st.session_state.stats_distance_metric),
+                        key="distance_metric_widget"
                     )
-                    title_suffix = "(Min-Max normalisé)"
-                else:
-                    matrix_transformed = matrix_df
-                    title_suffix = ""
+                    # Mettre à jour session_state
+                    st.session_state.stats_distance_metric = distance_metric
+                    
+                    from scipy.spatial.distance import pdist, squareform
+                    
+                    if distance_metric == "Euclidienne":
+                        distances = pdist(matrix_df.values, metric='euclidean')
+                    else:
+                        distances = pdist(matrix_df.values, metric='cosine')
+                    
+                    distance_matrix = squareform(distances)
+                    distance_df = pd.DataFrame(
+                        distance_matrix,
+                        index=matrix_df.index,
+                        columns=matrix_df.index
+                    )
+                    
+                    fig_dist = px.imshow(
+                        distance_df,
+                        text_auto=".2f",
+                        aspect="auto",
+                        title=f"Matrice de distance {distance_metric.lower()} entre échantillons",
+                        color_continuous_scale='Plasma'
+                    )
+                    
+                    fig_dist.update_layout(height=600)
+                    st.plotly_chart(fig_dist, use_container_width=True, key=generate_unique_key("distance_heatmap"))
                 
-                max_features = min(100, len(matrix_df.columns))
-                n_features = st.slider(
-                    "Nombre de features à afficher",
-                    10, max_features, 
-                    min(st.session_state.stats_heatmap_features, max_features),
-                    key="heatmap_features_widget"
-                )
-                # Mettre à jour session_state
-                st.session_state.stats_heatmap_features = n_features
+            else:
+                st.warning("""
+                ⚠️ Veuillez charger le fichier **feature_matrix.csv** pour accéder aux analyses statistiques avancées.
                 
-                feature_var = matrix_transformed.var(axis=0).nlargest(n_features)
-                selected_features = feature_var.index
-                
-                matrix_subset = matrix_transformed[selected_features]
-                
-                fig = px.imshow(
-                    matrix_subset,
-                    labels=dict(x="Features", y="Échantillons", color=f"Intensité {title_suffix}"),
-                    title=f"Heatmap des intensités {title_suffix}",
-                    aspect="auto",
-                    color_continuous_scale='Viridis'
-                )
-                
-                fig.update_layout(height=600)
-                st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("advanced_heatmap"))
-                
-                st.subheader("📏 Heatmap des distances entre échantillons")
-                
-                distance_metric = st.selectbox(
-                    "Métrique de distance",
-                    ["Euclidienne", "Cosinus"],
-                    index=["Euclidienne", "Cosinus"].index(st.session_state.stats_distance_metric),
-                    key="distance_metric_widget"
-                )
-                # Mettre à jour session_state
-                st.session_state.stats_distance_metric = distance_metric
-                
-                from scipy.spatial.distance import pdist, squareform
-                
-                if distance_metric == "Euclidienne":
-                    distances = pdist(matrix_df.values, metric='euclidean')
-                else:
-                    distances = pdist(matrix_df.values, metric='cosine')
-                
-                distance_matrix = squareform(distances)
-                distance_df = pd.DataFrame(
-                    distance_matrix,
-                    index=matrix_df.index,
-                    columns=matrix_df.index
-                )
-                
-                fig_dist = px.imshow(
-                    distance_df,
-                    text_auto=".2f",
-                    aspect="auto",
-                    title=f"Matrice de distance {distance_metric.lower()} entre échantillons",
-                    color_continuous_scale='Plasma'
-                )
-                
-                fig_dist.update_layout(height=600)
-                st.plotly_chart(fig_dist, use_container_width=True, key=generate_unique_key("distance_heatmap"))
-            
-        else:
-            st.warning("""
-            ⚠️ Veuillez charger le fichier **feature_matrix.csv** pour accéder aux analyses statistiques avancées.
-            
-            Ce fichier doit contenir une matrice avec :
-            - Lignes : échantillons
-            - Colonnes : features (format : F0001_mz102.9880)
-            - Valeurs : intensités
-            """)
+                Ce fichier doit contenir une matrice avec :
+                - Lignes : échantillons
+                - Colonnes : features (format : F0001_mz102.9880)
+                - Valeurs : intensités
+                """)
     
     elif st.session_state.active_tab == "reports":
         if features_df is None:
@@ -3921,4 +4307,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
